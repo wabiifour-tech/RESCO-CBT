@@ -77,8 +77,8 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white/10 backdrop-blur rounded-2xl mb-4">
-            <GraduationCap className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur rounded-2xl mb-4 overflow-hidden">
+            <img src="/logo.png" alt="RESCO Logo" className="w-full h-full object-contain p-1" />
           </div>
           <h1 className="text-3xl font-bold text-white">RESCO CBT</h1>
           <p className="text-blue-200 mt-1">Redeemer's Schools and College, Owotoro</p>
@@ -134,27 +134,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Demo Credentials */}
-          <div className="mt-6 pt-4 border-t border-gray-100">
-            <p className="text-xs text-gray-400 mb-2 text-center">Demo Credentials</p>
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <div className="bg-gray-50 rounded-lg p-2 text-center">
-                <p className="font-medium text-gray-700">Student</p>
-                <p className="text-gray-500">john@resco.edu.ng</p>
-                <p className="text-gray-500">student123</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-2 text-center">
-                <p className="font-medium text-gray-700">Teacher</p>
-                <p className="text-gray-500">adeyemi@resco.edu.ng</p>
-                <p className="text-gray-500">teacher123</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-2 text-center">
-                <p className="font-medium text-gray-700">Admin</p>
-                <p className="text-gray-500">admin@resco.edu.ng</p>
-                <p className="text-gray-500">admin123</p>
-              </div>
-            </div>
-          </div>
+
         </div>
       </div>
 
