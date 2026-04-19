@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["...", "prisma-engines"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npx prisma generate"]
+
+[phases.start]
+cmds = ["node src/server.js"]

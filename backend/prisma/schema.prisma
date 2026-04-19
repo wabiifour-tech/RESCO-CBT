@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      String   @default("STUDENT")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student Student?
+  teacher Teacher?
+
+  @@map("users")
+}
+
+model Student {
+  id          String @id @default(uuid())
+  admissionNo String @unique @map("admission_no")
+  firstName   String @map("first_name")
+  lastName    String @map("last_name")
+  className   String @default("JSS1") @map("class_name")
+
+  user    User     @relation(fields: [id], references: [id], onDelete: Cascade)
+  results Result[]
+
+  @@map("students")
+}
+
+model Teacher {
+  id        String  @id @default(uuid())
+  firstName String  @map("first_name")
+  lastName  String  @map("last_name")
+  status    String  @default("PENDING")
+  subjects  String  @default("[]")
+
+  user        User               @relation(fields: [id], references: [id], onDelete: Cascade)
+  assignments TeacherAssignment[]
+
+  @@map("teachers")
+}
+
+model TeacherAssignment {
+  id           String @id @default(uuid())
+  teacherId    String @map("teacher_id")
+  subject      String
+  className    String @default("JSS1") @map("class_name")
+  academicYear String @default("2024/2025") @map("academic_year")
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  exams   Exam[]
+
+  @@unique([teacherId, subject, className])
+  @@map("teacher_assignments")
+}
+
+model Exam {
+  id               String            @id @default(uuid())
+  title            String
+  description      String?
+  type             String            @default("TEST")
+  status           String            @default("DRAFT")
+  duration         Int
+  totalMarks       Int               @default(100)
+  passMark         Int               @default(50)
+  startDate        String            @default("")
+  endDate          String            @default("")
+  resultVisibility String            @default("IMMEDIATE") @map("result_visibility")
+  shuffleQuestions Int               @default(1) @map("shuffle_questions")
+  shuffleOptions   Int               @default(1) @map("shuffle_options")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  assignmentId String            @map("assignment_id")
+  assignment   TeacherAssignment @relation(fields: [assignmentId], references: [id])
+  questions    ExamQuestion[]
+  results      Result[]
+
+  @@map("exams")
+}
+
+model ExamQuestion {
+  id       String @id @default(uuid())
+  examId   String @map("exam_id")
+  question String
+  optionA  String @map("option_a")
+  optionB  String @map("option_b")
+  optionC  String @map("option_c")
+  optionD  String @map("option_d")
+  answer   String
+  marks    Int    @default(1)
+
+  exam          Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  resultAnswers ResultAnswer[]
+
+  @@map("exam_questions")
+}
+
+model Result {
+  id          String         @id @default(uuid())
+  examId      String         @map("exam_id")
+  studentId   String         @map("student_id")
+  score       Int
+  totalMarks  Int            @default(100) @map("total_marks")
+  percentage  Float          @default(0)
+  submittedAt DateTime       @default(now()) @map("submitted_at")
+  timeSpent   Int            @default(0) @map("time_spent")
+
+  exam     Exam          @relation(fields: [examId], references: [id])
+  student  Student       @relation(fields: [studentId], references: [id])
+  answers  ResultAnswer[]
+
+  @@unique([examId, studentId])
+  @@map("results")
+}
+
+model ResultAnswer {
+  id         String @id @default(uuid())
+  resultId   String @map("result_id")
+  questionId String @map("question_id")
+  selected   String?
+  correct    Int    @default(0)
+
+  result  Result       @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  question ExamQuestion @relation(fields: [questionId], references: [id])
+
+  @@map("result_answers")
+}
