@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Development: Vite proxies /api to localhost:5000
 // Production: Points to your Railway backend URL
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://resco-cbt-jwtsecret.up.railway.app/api';
 
 const api = axios.create({
   baseURL: API_BASE,
