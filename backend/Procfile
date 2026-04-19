@@ -1,1 +1,1 @@
-web: cd backend && npm install && npx prisma generate && npx prisma db push && node src/server.js
+web: npm install && npx prisma generate && npx prisma db push && node src/server.js
