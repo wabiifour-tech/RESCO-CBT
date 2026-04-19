@@ -11,24 +11,65 @@ const router = express.Router();
 // ──────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, fullName, password } = req.body;
 
-    if (!email || !password) {
+    if ((!email && !fullName) || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Email and password are required.',
+        message: 'Email or full name and password are required.',
       });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-      include: { student: true, teacher: true },
-    });
+    let user;
+
+    if (email && email.includes('@')) {
+      // Admin login via email
+      user = await prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+        include: { student: true, teacher: true },
+      });
+    } else {
+      // Student/Teacher login via full name
+      const name = (fullName || email || '').trim().toLowerCase();
+      const parts = name.split(/\s+/);
+
+      if (parts.length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please enter your full name (first and last name).',
+        });
+      }
+
+      // Try to match by student first, then teacher
+      user = await prisma.user.findFirst({
+        where: {
+          role: 'STUDENT',
+          student: {
+            firstName: { equals: parts[0], mode: 'insensitive' },
+            lastName: { equals: parts[parts.length - 1], mode: 'insensitive' },
+          },
+        },
+        include: { student: true, teacher: true },
+      });
+
+      if (!user) {
+        user = await prisma.user.findFirst({
+          where: {
+            role: 'TEACHER',
+            teacher: {
+              firstName: { equals: parts[0], mode: 'insensitive' },
+              lastName: { equals: parts[parts.length - 1], mode: 'insensitive' },
+            },
+          },
+          include: { student: true, teacher: true },
+        });
+      }
+    }
 
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password.',
+        message: 'Invalid name or password.',
       });
     }
 
@@ -36,7 +77,7 @@ router.post('/login', async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password.',
+        message: 'Invalid name or password.',
       });
     }
 

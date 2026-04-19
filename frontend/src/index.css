@@ -1,37 +1,686 @@
+/* ============================================
+   RESCO CBT — Fun, Colorful, Academic Theme
+   For primary & secondary school students
+   ============================================ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: system-ui, -apple-system, sans-serif; }
+/* ── Base Reset ─────────────────────────── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: #f1f5f9; }
-::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #64748b; }
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
+body {
+  font-family: 'Nunito', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #1e293b;
+  background: #f8fafc;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Custom Scrollbar ───────────────────── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: linear-gradient(180deg, #ede9fe, #e0e7ff, #dbeafe);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #a78bfa, #818cf8, #6366f1);
+  border-radius: 10px;
+  border: 2px solid #ede9fe;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #8b5cf6, #6366f1, #4f46e5);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #8b5cf6 #ede9fe;
+}
+
+/* ── Keyframe Animations ────────────────── */
+
+/* fadeIn — gentle appear */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* slideUp — rise into view */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* slideInLeft — enter from the left */
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* slideInRight — enter from the right */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* pulse — soft glow pulse */
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.05); opacity: 0.85; }
+}
+
+/* bounce — playful bounce */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  20%      { transform: translateY(-12px); }
+  40%      { transform: translateY(0); }
+  60%      { transform: translateY(-6px); }
+  80%      { transform: translateY(0); }
+}
+
+/* float — gentle floating up and down */
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25%      { transform: translateY(-10px) rotate(1deg); }
+  75%      { transform: translateY(5px) rotate(-1deg); }
+}
+
+/* sparkle — twinkle effect */
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  50%      { opacity: 1; transform: scale(1) rotate(180deg); }
+}
+
+/* flipCard — 3D card flip */
+@keyframes flipCard {
+  0%   { transform: perspective(800px) rotateY(0deg); }
+  50%  { transform: perspective(800px) rotateY(90deg); }
+  100% { transform: perspective(800px) rotateY(0deg); }
+}
+
+/* shake — error shake */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80%     { transform: translateX(4px); }
+}
+
+/* spin — loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* animatedGradient — shifting background */
+@keyframes animatedGradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* timerPulse — exam timer urgency */
+@keyframes timerPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50%      { transform: scale(1.06); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
+
+/* confettiFall — particle drop */
+@keyframes confettiFall {
+  0%   { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* confettiBurst — explode outward */
+@keyframes confettiBurst {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* progressFill — smooth bar fill */
+@keyframes progressFill {
+  from { width: 0%; }
+}
+
+/* scaleIn — zoom into view */
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* wiggle — playful wiggle */
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(-3deg); }
+  75%      { transform: rotate(3deg); }
+}
+
+/* slideDown — drop in from top */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* glowPulse — neon glow pulse */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(139, 92, 246, 0.3); }
+  50%      { box-shadow: 0 0 20px rgba(139, 92, 246, 0.6), 0 0 40px rgba(139, 92, 246, 0.2); }
+}
+
+/* morphBlob — background blob morph */
+@keyframes morphBlob {
+  0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  25%      { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+  50%      { border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%; }
+  75%      { border-radius: 60% 40% 60% 30% / 60% 40% 30% 70%; }
+}
+
+/* ── Animation Utility Classes ──────────── */
+.animate-fadeIn {
+  animation: fadeIn 0.6s ease-out both;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.6s ease-out both;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.6s ease-out both;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.6s ease-out both;
+}
+
+.animate-pulse-fun {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-bounce-fun {
+  animation: bounce 1.5s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-sparkle {
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+.animate-flipCard {
+  animation: flipCard 0.8s ease-in-out;
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.animate-spin-slow {
+  animation: spin 1.2s linear infinite;
+}
+
+.animate-animatedGradient {
+  background-size: 200% 200%;
+  animation: animatedGradient 6s ease infinite;
+}
+
+.animate-timerPulse {
+  animation: timerPulse 1.2s ease-in-out infinite;
+}
+
+.animate-progressFill {
+  animation: progressFill 1s ease-out both;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.4s ease-out both;
+}
+
+.animate-wiggle {
+  animation: wiggle 1s ease-in-out infinite;
+}
+
+.animate-slideDown {
+  animation: slideDown 0.4s ease-out both;
+}
+
+.animate-glowPulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+.animate-morphBlob {
+  animation: morphBlob 8s ease-in-out infinite;
+}
+
+/* Staggered delays */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+.delay-700 { animation-delay: 700ms; }
+.delay-1000 { animation-delay: 1000ms; }
+
+/* ── Gradient Backgrounds ───────────────── */
+.bg-gradient-fun {
+  background: linear-gradient(-45deg, #a78bfa, #818cf8, #6366f1, #8b5cf6, #7c3aed, #a855f7);
+  background-size: 400% 400%;
+  animation: animatedGradient 8s ease infinite;
+}
+
+.bg-gradient-ocean {
+  background: linear-gradient(-45deg, #06b6d4, #3b82f6, #6366f1, #8b5cf6);
+  background-size: 400% 400%;
+  animation: animatedGradient 10s ease infinite;
+}
+
+.bg-gradient-sunset {
+  background: linear-gradient(-45deg, #f97316, #ef4444, #ec4899, #a855f7);
+  background-size: 400% 400%;
+  animation: animatedGradient 8s ease infinite;
+}
+
+.bg-gradient-forest {
+  background: linear-gradient(-45deg, #22c55e, #14b8a6, #06b6d4, #3b82f6);
+  background-size: 400% 400%;
+  animation: animatedGradient 10s ease infinite;
+}
+
+.bg-gradient-candy {
+  background: linear-gradient(-45deg, #f472b6, #c084fc, #818cf8, #60a5fa, #34d399);
+  background-size: 400% 400%;
+  animation: animatedGradient 12s ease infinite;
+}
+
+/* ── Smooth Transitions ─────────────────── */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Override for specific elements that need faster transitions */
+a, button, input, select, textarea {
+  transition: all 0.2s ease;
+}
+
+/* ── Component Layer ────────────────────── */
 @layer components {
+
+  /* ── Buttons ─────────────────────────── */
+
   .btn-primary {
-    @apply bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply relative overflow-hidden inline-flex items-center justify-center gap-2
+           px-6 py-3 rounded-xl font-bold text-white text-sm
+           bg-gradient-to-r from-violet-600 to-indigo-600
+           hover:from-violet-500 hover:to-indigo-500
+           active:scale-95 active:shadow-lg
+           shadow-lg shadow-violet-500/25
+           focus:outline-none focus:ring-4 focus:ring-violet-300
+           disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100;
   }
+
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.25) 45%, rgba(255,255,255,0.25) 50%, transparent 55%);
+    background-size: 200% 100%;
+    background-position: 200% 0;
+    transition: background-position 0.6s ease;
+  }
+
+  .btn-primary:hover::after {
+    background-position: -100% 0;
+  }
+
   .btn-danger {
-    @apply bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium;
+    @apply relative overflow-hidden inline-flex items-center justify-center gap-2
+           px-6 py-3 rounded-xl font-bold text-white text-sm
+           bg-gradient-to-r from-rose-500 to-red-600
+           hover:from-rose-400 hover:to-red-500
+           active:scale-95
+           shadow-lg shadow-red-500/25
+           focus:outline-none focus:ring-4 focus:ring-red-300
+           disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100;
   }
+
+  .btn-danger::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.2) 45%, rgba(255,255,255,0.2) 50%, transparent 55%);
+    background-size: 200% 100%;
+    background-position: 200% 0;
+    transition: background-position 0.6s ease;
+  }
+
+  .btn-danger:hover::after {
+    background-position: -100% 0;
+  }
+
   .btn-success {
-    @apply bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium;
+    @apply relative overflow-hidden inline-flex items-center justify-center gap-2
+           px-6 py-3 rounded-xl font-bold text-white text-sm
+           bg-gradient-to-r from-emerald-500 to-green-600
+           hover:from-emerald-400 hover:to-green-500
+           active:scale-95
+           shadow-lg shadow-green-500/25
+           focus:outline-none focus:ring-4 focus:ring-green-300
+           disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100;
   }
+
+  .btn-success::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.2) 45%, rgba(255,255,255,0.2) 50%, transparent 55%);
+    background-size: 200% 100%;
+    background-position: 200% 0;
+    transition: background-position 0.6s ease;
+  }
+
+  .btn-success:hover::after {
+    background-position: -100% 0;
+  }
+
+  .btn-warning {
+    @apply relative overflow-hidden inline-flex items-center justify-center gap-2
+           px-6 py-3 rounded-xl font-bold text-white text-sm
+           bg-gradient-to-r from-amber-500 to-orange-500
+           hover:from-amber-400 hover:to-orange-400
+           active:scale-95
+           shadow-lg shadow-orange-500/25
+           focus:outline-none focus:ring-4 focus:ring-amber-300
+           disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100;
+  }
+
+  .btn-warning::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.2) 45%, rgba(255,255,255,0.2) 50%, transparent 55%);
+    background-size: 200% 100%;
+    background-position: 200% 0;
+    transition: background-position 0.6s ease;
+  }
+
+  .btn-warning:hover::after {
+    background-position: -100% 0;
+  }
+
+  /* ── Cards ───────────────────────────── */
+
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+    @apply bg-white rounded-2xl border border-gray-100 p-6
+           shadow-sm hover:shadow-xl hover:shadow-violet-100/50
+           hover:-translate-y-1;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
+
+  .card-colored {
+    @apply rounded-2xl border p-6 shadow-sm
+           hover:shadow-xl hover:-translate-y-1;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .card-glass {
+    @apply bg-white/70 backdrop-blur-xl rounded-2xl border border-white/30 p-6
+           shadow-lg;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ── Input Fields ────────────────────── */
+
   .input-field {
-    @apply w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all;
+    @apply w-full px-4 py-3 rounded-xl border-2 border-gray-200
+           bg-gray-50/50 text-gray-800 placeholder-gray-400
+           focus:bg-white focus:border-violet-400 focus:ring-4 focus:ring-violet-100
+           outline-none font-medium;
+    transition: all 0.25s ease;
   }
+
+  .input-field:focus {
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+  }
+
+  .input-field:hover:not(:focus) {
+    border-color: #c4b5fd;
+  }
+
+  /* ── Badges ──────────────────────────── */
+
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold tracking-wide;
   }
-  .badge-green { @apply bg-green-100 text-green-800; }
-  .badge-red { @apply bg-red-100 text-red-800; }
-  .badge-yellow { @apply bg-yellow-100 text-yellow-800; }
-  .badge-blue { @apply bg-blue-100 text-blue-800; }
-  .badge-gray { @apply bg-gray-100 text-gray-800; }
+
+  .badge-green {
+    @apply bg-emerald-100 text-emerald-700;
+  }
+
+  .badge-red {
+    @apply bg-rose-100 text-rose-700;
+  }
+
+  .badge-yellow {
+    @apply bg-amber-100 text-amber-700;
+  }
+
+  .badge-blue {
+    @apply bg-blue-100 text-blue-700;
+  }
+
+  .badge-purple {
+    @apply bg-violet-100 text-violet-700;
+  }
+
+  .badge-pink {
+    @apply bg-pink-100 text-pink-700;
+  }
+
+  .badge-orange {
+    @apply bg-orange-100 text-orange-700;
+  }
+
+  .badge-gray {
+    @apply bg-gray-100 text-gray-700;
+  }
+
+  .badge-gradient {
+    @apply bg-gradient-to-r from-violet-500 to-indigo-500 text-white;
+  }
+
+  /* ── Tooltip ─────────────────────────── */
+
+  .tooltip {
+    @apply relative;
+  }
+
+  .tooltip::after {
+    content: attr(data-tooltip);
+    @apply absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5
+           rounded-lg bg-gray-900 text-white text-xs font-medium whitespace-nowrap
+           opacity-0 pointer-events-none;
+    transition: all 0.2s ease;
+    transform: translateX(-50%) translateY(4px);
+  }
+
+  .tooltip:hover::after {
+    @apply opacity-100;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── Progress Bar ────────────────────── */
+
+  .progress-bar {
+    @apply w-full h-3 bg-gray-200 rounded-full overflow-hidden;
+  }
+
+  .progress-bar-fill {
+    @apply h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500;
+    animation: progressFill 1s ease-out both;
+  }
+
+  .progress-bar-fill-green {
+    @apply h-full rounded-full bg-gradient-to-r from-emerald-400 to-green-500;
+    animation: progressFill 1s ease-out both;
+  }
+
+  .progress-bar-fill-orange {
+    @apply h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500;
+    animation: progressFill 1s ease-out both;
+  }
+
+  .progress-bar-fill-pink {
+    @apply h-full rounded-full bg-gradient-to-r from-pink-400 to-rose-500;
+    animation: progressFill 1s ease-out both;
+  }
+
+  /* ── Loading Spinner ─────────────────── */
+
+  .spinner {
+    @apply w-6 h-6 rounded-full;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .spinner-dark {
+    @apply w-6 h-6 rounded-full;
+    border: 3px solid rgba(139, 92, 246, 0.2);
+    border-top-color: #8b5cf6;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .spinner-lg {
+    @apply w-10 h-10 rounded-full;
+    border: 4px solid rgba(139, 92, 246, 0.2);
+    border-top-color: #8b5cf6;
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* ── Exam Timer ──────────────────────── */
+
+  .exam-timer {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl
+           bg-gradient-to-r from-rose-500 to-red-600 text-white
+           font-bold text-lg tabular-nums;
+    animation: timerPulse 1.5s ease-in-out infinite;
+  }
+
+  .exam-timer-safe {
+    @apply bg-gradient-to-r from-emerald-500 to-green-600;
+    animation: none;
+  }
+
+  /* ── Flashcard ───────────────────────── */
+
+  .flashcard-container {
+    perspective: 800px;
+  }
+
+  .flashcard {
+    @apply w-full h-full relative;
+    transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .flashcard.flipped {
+    transform: rotateY(180deg);
+  }
+
+  .flashcard-front,
+  .flashcard-back {
+    @apply absolute inset-0 backface-hidden rounded-2xl;
+  }
+
+  .flashcard-back {
+    transform: rotateY(180deg);
+  }
+
+  /* ── Confetti Particles ──────────────── */
+
+  .confetti-container {
+    @apply fixed inset-0 pointer-events-none z-50 overflow-hidden;
+  }
+
+  .confetti-piece {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    top: -10px;
+    animation: confettiFall linear forwards;
+  }
+
+  /* ── Gradient Text ───────────────────── */
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-600;
+  }
+
+  .text-gradient-fun {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-violet-500 to-indigo-500;
+  }
+
+  .text-gradient-sunrise {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-rose-400 to-pink-500;
+  }
+
+  /* ── Glass Morphism ──────────────────── */
+
+  .glass {
+    @apply bg-white/10 backdrop-blur-xl border border-white/20;
+  }
+
+  .glass-dark {
+    @apply bg-black/10 backdrop-blur-xl border border-white/10;
+  }
+}
+
+/* ── Fun Background Patterns ─────────────── */
+.bg-dots {
+  background-image: radial-gradient(circle, #e9d5ff 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(139, 92, 246, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.bg-waves {
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='20' viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M21.184 20c.357-.13.72-.264 1.088-.402l1.768-.661C33.64 15.347 39.647 14 50 14c10.271 0 15.362 1.222 24.629 4.928.955.383 1.869.74 2.75 1.072h6.225c-2.51-.73-5.139-1.691-8.233-2.928C65.888 13.278 60.562 12 50 12c-10.626 0-16.855 1.397-26.66 5.063l-1.767.662c-2.475.923-4.66 1.674-6.724 2.275h6.335zm0-20C13.258 2.892 8.077 4 0 4V2c5.744 0 9.951-.574 14.85-2h6.334zM77.38 0C85.239 2.966 90.502 4 100 4V2c-6.842 0-11.386-.542-16.396-2h-6.225zM0 14c8.44 0 13.718-1.21 22.272-4.402l1.768-.661C33.64 5.347 39.647 4 50 4c10.271 0 15.362 1.222 24.629 4.928C84.112 12.722 89.438 14 100 14v-2c-10.271 0-15.362-1.222-24.629-4.928C65.888 3.278 60.562 2 50 2 39.374 2 33.145 3.397 23.34 7.063l-1.767.662C13.223 10.84 8.163 12 0 12v2z' fill='%23a78bfa' fill-opacity='0.08' fill-rule='evenodd'/%3E%3C/svg%3E");
+}
+
+/* ── Selection Colors ────────────────────── */
+::selection {
+  background: rgba(139, 92, 246, 0.25);
+  color: #4c1d95;
+}
+
+::-moz-selection {
+  background: rgba(139, 92, 246, 0.25);
+  color: #4c1d95;
 }
