@@ -273,6 +273,7 @@ export default function StudentDashboard() {
         examId: examDetail.id,
         answers: formattedAnswers,
         timeSpent: elapsed,
+        examStartTime: startTimeRef.current ? new Date(startTimeRef.current).toISOString() : null,
       });
       setExamResult(res.data.result);
       if (auto) {

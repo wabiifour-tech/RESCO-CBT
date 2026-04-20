@@ -330,7 +330,7 @@ export default function LoginPage() {
                 <div className="relative">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><FieldIcon className="w-4 h-4" /></div>
                   <input type={role === 'ADMIN' ? 'email' : 'text'} value={loginField} onChange={(e) => setLoginField(e.target.value)}
-                    className="input-field pl-10" placeholder={getPlaceholder()} required autoComplete={role === 'ADMIN' ? 'email' : 'username'} />
+                    className="input-field pl-10" placeholder={getPlaceholder()} required autoComplete="off" />
                 </div>
               </div>
 
@@ -341,7 +341,7 @@ export default function LoginPage() {
                     <Lock className="w-4 h-4" />
                   </div>
                   <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                    className="input-field pl-10" placeholder="Enter your password" required autoComplete="current-password" />
+                    className="input-field pl-10" placeholder="Enter your password" required autoComplete="off" />
                 </div>
               </div>
 

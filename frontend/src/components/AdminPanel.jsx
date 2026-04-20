@@ -20,7 +20,7 @@ const STATUS_COLORS = {
 const STAT_CARDS = [
   { key: 'totalStudents', label: 'Total Students',  icon: GraduationCap, gradient: ['#6366f1','#8b5cf6'], lightBg: '#eef2ff' },
   { key: 'totalTeachers', label: 'Total Teachers',  icon: Users,         gradient: ['#f59e0b','#f97316'], lightBg: '#fffbeb' },
-  { key: 'activeExams',   label: 'Active Exams',    icon: Clock,         gradient: ['#10b981','#059669'], lightBg: '#ecfdf5' },
+  { key: 'publishedExams', label: 'Active Exams',    icon: Clock,         gradient: ['#10b981','#059669'], lightBg: '#ecfdf5' },
   { key: 'totalResults',  label: 'Total Results',   icon: BarChart3,     gradient: ['#3b82f6','#6366f1'], lightBg: '#eff6ff' },
 ];
 
@@ -799,9 +799,12 @@ export default function AdminPanel() {
   const renderAnalytics = () => {
     if (!analytics) return renderLoader();
 
-    const classPerformance = analytics.classPerformance || [];
-    const subjectPerformance = analytics.subjectPerformance || [];
+    const classPerformance = analytics.performanceByClass || analytics.classPerformance || [];
+    const subjectPerformance = analytics.performanceBySubject || analytics.subjectPerformance || [];
     const passFail = analytics.passFail || {};
+    const topStudents = analytics.topStudents || [];
+    const examCompletionRates = analytics.examCompletionRates || [];
+    const recentlyActiveExams = analytics.recentlyActiveExams || [];
 
     return (
       <div style={{ animation: 'fadeIn 0.35s ease both' }}>
