@@ -7,7 +7,8 @@ import DailyDevotional from './DailyDevotional';
 import {
   LogOut, BookOpen, Users, UserCheck, UserX, UserPlus, BarChart3, Trash2,
   X, Eye, Shield, GraduationCap, TrendingUp, Clock, CheckCircle, XCircle,
-  Search, Download, Settings, ChevronRight, Sparkles, School, Award
+  Search, Download, Settings, ChevronRight, Sparkles, School, Award,
+  Upload, FileQuestion, Plus, Minus
 } from 'lucide-react';
 
 // ─── Color Maps (avoid template-literal classNames) ────────────────────────────
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',   icon: BarChart3 },
   { id: 'teachers',    label: 'Teachers',    icon: UserCheck },
   { id: 'students',    label: 'Students',    icon: GraduationCap },
+  { id: 'questions',   label: 'Questions',   icon: FileQuestion },
   { id: 'assignments', label: 'Assignments', icon: BookOpen },
   { id: 'analytics',   label: 'Analytics',   icon: TrendingUp },
 ];
@@ -90,6 +92,10 @@ export default function AdminPanel() {
   const [students, setStudents] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [draftExams, setDraftExams] = useState([]);
+  const [selectedExamId, setSelectedExamId] = useState('');
+  const [examQuestions, setExamQuestions] = useState([]);
+  const [selectedExamInfo, setSelectedExamInfo] = useState(null);
 
   // Search
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -97,10 +103,17 @@ export default function AdminPanel() {
 
   // Loading
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Modals
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [showStudentModal, setShowStudentModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [manualQuestions, setManualQuestions] = useState([
+    { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 },
+  ]);
 
   // Form data
   const [teacherForm, setTeacherForm] = useState({ firstName: '', lastName: '', username: '', password: '' });
@@ -164,6 +177,31 @@ export default function AdminPanel() {
     }
   }, []);
 
+  const fetchDraftExams = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/admin/questions/exams');
+      setDraftExams(res.data || []);
+    } catch (err) {
+      toast.error('Failed to load exams');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchExamQuestions = useCallback(async (examId) => {
+    setLoading(true);
+    try {
+      const res = await api.get('/admin/questions/' + examId);
+      setSelectedExamInfo(res.data.exam);
+      setExamQuestions(res.data.questions || []);
+    } catch (err) {
+      toast.error('Failed to load questions');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Load data when tab changes
   useEffect(() => {
     if (activeTab === 'dashboard') fetchDashboard();
@@ -171,7 +209,8 @@ export default function AdminPanel() {
     else if (activeTab === 'students') fetchStudents();
     else if (activeTab === 'assignments') fetchAssignments();
     else if (activeTab === 'analytics') fetchAnalytics();
-  }, [activeTab, fetchDashboard, fetchTeachers, fetchStudents, fetchAssignments, fetchAnalytics]);
+    else if (activeTab === 'questions') fetchDraftExams();
+  }, [activeTab, fetchDashboard, fetchTeachers, fetchStudents, fetchAssignments, fetchAnalytics, fetchDraftExams]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleLogout = () => {
@@ -268,6 +307,78 @@ export default function AdminPanel() {
     } catch (err) {
       toast.error('Failed to delete assignment');
     }
+  };
+
+  // ─── Question Handlers ──────────────────────────────────────────────────────
+  const handleSelectExam = (examId) => {
+    setSelectedExamId(examId);
+    if (examId) fetchExamQuestions(examId);
+    else { setExamQuestions([]); setSelectedExamInfo(null); }
+  };
+
+  const handleCSVUpload = async (e) => {
+    e.preventDefault();
+    if (!uploadFile) { toast.error('Select a CSV file'); return; }
+    if (!selectedExamId) { toast.error('Select an exam first'); return; }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('examId', selectedExamId);
+      const res = await api.post('/admin/questions/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success(`Uploaded ${res.data.data.created}/${res.data.data.total} questions`);
+      setShowUploadModal(false);
+      setUploadFile(null);
+      fetchExamQuestions(selectedExamId);
+      fetchDraftExams();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleManualSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedExamId) { toast.error('Select an exam first'); return; }
+    setUploading(true);
+    try {
+      const res = await api.post('/admin/questions/manual', { examId: selectedExamId, questions: manualQuestions });
+      toast.success(res.data.message);
+      setShowManualModal(false);
+      setManualQuestions([{ question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }]);
+      fetchExamQuestions(selectedExamId);
+      fetchDraftExams();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to add questions');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteQuestion = async (questionId) => {
+    if (!window.confirm('Delete this question?')) return;
+    try {
+      await api.delete('/admin/questions/' + questionId);
+      toast.success('Question deleted');
+      fetchExamQuestions(selectedExamId);
+      fetchDraftExams();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete question');
+    }
+  };
+
+  const downloadCSVTemplate = () => {
+    const csv = 'question,optionA,optionB,optionC,optionD,answer,marks\nWhat is 2+2?,2,3,4,5,C,1\nWhat is the capital of France?,London,Berlin,Paris,Madrid,C,2';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'question_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // ─── Filtered lists ────────────────────────────────────────────────────────
@@ -1226,12 +1337,186 @@ export default function AdminPanel() {
     '#10b981',
   );
 
+  // ─── Tab Content: Questions ────────────────────────────────────────────────
+  const renderQuestions = () => {
+    const inputStyle = { width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 13, outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' };
+    const btnPrimary = { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)', transition: 'all 0.2s ease' };
+    const btnSuccess = { ...btnPrimary, background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' };
+    const btnDanger = { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: 'none', background: '#fee2e2', color: '#991b1b', fontWeight: 600, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s ease' };
+
+    return (
+      <div style={{ animation: 'fadeIn 0.35s ease both' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
+          <div>
+            <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Manage Questions</h2>
+            <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0 0' }}>Upload or manually add questions to DRAFT exams</p>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {selectedExamId && (
+              <>
+                <button onClick={() => setShowUploadModal(true)} style={btnSuccess}><Upload size={16} /> Upload CSV</button>
+                <button onClick={() => setShowManualModal(true)} style={btnPrimary}><Plus size={16} /> Add Manually</button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Exam selector */}
+        <div style={{ ...cardBase, padding: 20, marginBottom: 24 }}>
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 8 }}>Select a DRAFT Exam</label>
+          <select
+            value={selectedExamId}
+            onChange={(e) => handleSelectExam(e.target.value)}
+            style={{ ...inputStyle, maxWidth: 500 }}
+          >
+            <option value="">-- Choose an exam --</option>
+            {draftExams.map((ex) => (
+              <option key={ex.id} value={ex.id}>{ex.title} ({ex.subject} - {ex.className}) [{ex.questionCount} questions]</option>
+            ))}
+          </select>
+          {draftExams.length === 0 && !loading && (
+            <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 12, marginBlockStart: 12 }}>No DRAFT exams found. Ask a teacher to create an exam first.</p>
+          )}
+        </div>
+
+        {/* Questions table */}
+        {selectedExamId && selectedExamInfo && (
+          <div style={{ ...cardBase, overflow: 'hidden', animation: 'fadeInUp 0.4s ease both' }}>
+            <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '2px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: 0 }}>{selectedExamInfo.title}</h3>
+                <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0 0' }}>{selectedExamInfo.subject} - {selectedExamInfo.className} &middot; {examQuestions.length} question(s)</p>
+              </div>
+              <a href="#" onClick={(e) => { e.preventDefault(); downloadCSVTemplate(); }} style={{ fontSize: 13, color: '#6366f1', fontWeight: 600, textDecoration: 'none' }}>Download CSV Template</a>
+            </div>
+
+            {loading ? renderLoader() : examQuestions.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+                <FileQuestion size={40} style={{ marginBottom: 12, opacity: 0.5 }} />
+                <p style={{ fontSize: 15, fontWeight: 500 }}>No questions yet</p>
+                <p style={{ fontSize: 13 }}>Upload a CSV or add questions manually</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>#</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Question</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>A</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>B</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>C</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>D</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Answer</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Marks</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {examQuestions.map((q, idx) => (
+                      <tr key={q.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+                        <td style={{ padding: '10px 16px', fontSize: 13, color: '#64748b', fontWeight: 600 }}>{idx + 1}</td>
+                        <td style={{ padding: '10px 16px', fontSize: 13, color: '#334155', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.question}</td>
+                        <td style={{ padding: '10px 16px', fontSize: 13, color: '#334155' }}>{q.optionA}</td>
+                        <td style={{ padding: '10px 16px', fontSize: 13, color: '#334155' }}>{q.optionB}</td>
+                        <td style={{ padding: '10px 16px', fontSize: 13, color: '#334155' }}>{q.optionC}</td>
+                        <td style={{ padding: '10px 16px', fontSize: 13, color: '#334155' }}>{q.optionD}</td>
+                        <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, background: q.answer === 'C' ? '#dcfce7' : q.answer === 'A' ? '#dbeafe' : q.answer === 'B' ? '#fef9c3' : '#fee2e2', color: q.answer === 'C' ? '#166534' : q.answer === 'A' ? '#1e40af' : q.answer === 'B' ? '#854d0e' : '#991b1b', fontWeight: 700, fontSize: 13 }}>{q.answer}</span>
+                        </td>
+                        <td style={{ padding: '10px 16px', textAlign: 'center', fontSize: 13, fontWeight: 600 }}>{q.marks}</td>
+                        <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                          <button onClick={() => handleDeleteQuestion(q.id)} style={btnDanger}><Trash2 size={13} /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Upload CSV Modal */}
+        {showUploadModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+            <div style={{ ...cardBase, padding: 28, maxWidth: 460, width: '100%', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
+              <button onClick={() => setShowUploadModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Upload Questions (CSV)</h2>
+              <form onSubmit={handleCSVUpload} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ border: '2px dashed #d1d5db', borderRadius: 12, padding: '28px 16px', textAlign: 'center', background: '#fafbfc' }}>
+                  <Upload size={32} style={{ margin: '0 auto 8px', color: '#94a3b8' }} />
+                  <input type="file" accept=".csv" onChange={(e) => setUploadFile(e.target.files[0])} style={{ display: 'none' }} id="admin-csv-upload" />
+                  <label htmlFor="admin-csv-upload" style={{ cursor: 'pointer', color: '#6366f1', fontWeight: 600, fontSize: 14, textDecoration: 'underline' }}>
+                    {uploadFile ? uploadFile.name : 'Click to select CSV file'}
+                  </label>
+                  <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>Format: question, optionA, optionB, optionC, optionD, answer, marks</p>
+                </div>
+                <button type="submit" disabled={uploading} style={{ ...btnSuccess, width: '100%', justifyContent: 'center', opacity: uploading ? 0.6 : 1 }}>
+                  {uploading ? 'Uploading...' : 'Upload Questions'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Add Modal */}
+        {showManualModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+            <div style={{ ...cardBase, padding: 28, maxWidth: 720, width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
+              <button onClick={() => setShowManualModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Add Questions Manually</h2>
+              <form onSubmit={handleManualSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {manualQuestions.map((q, idx) => (
+                  <div key={idx} style={{ padding: 16, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Question #{idx + 1}</span>
+                      {manualQuestions.length > 1 && (
+                        <button type="button" onClick={() => setManualQuestions(manualQuestions.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px 6px', borderRadius: 6 }}><Minus size={16} /></button>
+                      )}
+                    </div>
+                    <input placeholder="Question text" value={q.question} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], question: e.target.value }; setManualQuestions(updated); }} required style={inputStyle} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                      <input placeholder="Option A" value={q.optionA} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionA: e.target.value }; setManualQuestions(updated); }} required style={inputStyle} />
+                      <input placeholder="Option B" value={q.optionB} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionB: e.target.value }; setManualQuestions(updated); }} required style={inputStyle} />
+                      <input placeholder="Option C" value={q.optionC} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionC: e.target.value }; setManualQuestions(updated); }} required style={inputStyle} />
+                      <input placeholder="Option D" value={q.optionD} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionD: e.target.value }; setManualQuestions(updated); }} required style={inputStyle} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 4, display: 'block' }}>Correct Answer</label>
+                        <select value={q.answer} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], answer: e.target.value }; setManualQuestions(updated); }} style={inputStyle}>
+                          <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
+                        </select>
+                      </div>
+                      <div style={{ width: 100 }}>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 4, display: 'block' }}>Marks</label>
+                        <input type="number" min="1" value={q.marks} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], marks: parseInt(e.target.value) || 1 }; setManualQuestions(updated); }} required style={inputStyle} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button type="button" onClick={() => setManualQuestions([...manualQuestions, { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }])} style={{ ...btnPrimary, justifyContent: 'center', width: '100%' }}><Plus size={16} /> Add Another Question</button>
+                <button type="submit" disabled={uploading} style={{ ...btnSuccess, width: '100%', justifyContent: 'center', opacity: uploading ? 0.6 : 1 }}>
+                  {uploading ? 'Saving...' : `Save ${manualQuestions.length} Question(s)`}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ─── Tab Content Renderer ───────────────────────────────────────────────────
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard':   return renderDashboard();
       case 'teachers':    return renderTeachers();
       case 'students':    return renderStudents();
+      case 'questions':   return renderQuestions();
       case 'assignments': return renderAssignments();
       case 'analytics':   return renderAnalytics();
       default:            return renderDashboard();

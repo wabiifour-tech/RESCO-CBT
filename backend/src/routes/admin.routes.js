@@ -1,10 +1,63 @@
 const express = require('express');
+const multer = require('multer');
 const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/roleMiddleware');
 const bcrypt = require('bcryptjs');
 
 const router = express.Router();
+
+// ============================================================
+// Multer for CSV uploads
+// ============================================================
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedExtensions = ['.csv'];
+    const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+    if (allowedExtensions.includes(ext)) cb(null, true);
+    else cb(new Error('Only CSV files are allowed.'));
+  },
+});
+
+// ============================================================
+// CSV & Question helpers
+// ============================================================
+function parseCSV(buffer) {
+  const content = buffer.toString('utf-8').trim();
+  const lines = content.split(/\r?\n/);
+  if (lines.length < 2) return { error: 'CSV must have a header row and at least one data row.' };
+  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  const expected = ['question', 'optiona', 'optionb', 'optionc', 'optiond', 'answer', 'marks'];
+  const missing = expected.filter((h) => !headers.includes(h));
+  if (missing.length > 0) return { error: `Missing headers: ${missing.join(', ')}. Required: ${expected.join(', ')}` };
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const values = line.split(',').map((v) => v.trim());
+    if (values.length < 7) { rows.push({ _rawIndex: i + 1, _parseError: `Row ${i + 1}: Expected 7 columns, found ${values.length}.` }); continue; }
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = values[idx] || ''; });
+    obj._rawIndex = i + 1;
+    rows.push(obj);
+  }
+  return { rows };
+}
+
+function validateQuestion(q, index) {
+  const errors = [];
+  if (!q.question || !q.question.trim()) errors.push(`Row ${index}: "question" is required.`);
+  if (!q.optionA || !q.optionA.trim()) errors.push(`Row ${index}: "optionA" is required.`);
+  if (!q.optionB || !q.optionB.trim()) errors.push(`Row ${index}: "optionB" is required.`);
+  if (!q.optionC || !q.optionC.trim()) errors.push(`Row ${index}: "optionC" is required.`);
+  if (!q.optionD || !q.optionD.trim()) errors.push(`Row ${index}: "optionD" is required.`);
+  if (!q.answer || !['A','B','C','D'].includes(q.answer.toUpperCase())) errors.push(`Row ${index}: "answer" must be A, B, C, or D.`);
+  const marks = parseInt(q.marks, 10);
+  if (isNaN(marks) || marks <= 0) errors.push(`Row ${index}: "marks" must be a positive integer.`);
+  return { valid: errors.length === 0, errors, data: { question: q.question.trim(), optionA: q.optionA.trim(), optionB: q.optionB.trim(), optionC: q.optionC.trim(), optionD: q.optionD.trim(), answer: q.answer.toUpperCase(), marks } };
+}
 
 // All admin routes require authentication and ADMIN role
 router.use(authenticate, requireRole('ADMIN'));
@@ -1203,6 +1256,137 @@ router.get('/exams', async (req, res) => {
   } catch (error) {
     console.error('[Admin List Exams Error]', error);
     res.status(500).json({ error: 'Failed to list exams' });
+  }
+});
+
+// ============================================================
+// 15. GET /questions/exams — List DRAFT exams for question management
+// ============================================================
+router.get('/questions/exams', async (req, res) => {
+  try {
+    const exams = await prisma.exam.findMany({
+      where: { status: 'DRAFT' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        assignment: {
+          include: { teacher: { select: { firstName: true, lastName: true } } },
+        },
+        _count: { select: { questions: true } },
+      },
+    });
+    res.json(exams.map(e => ({
+      id: e.id, title: e.title, type: e.type,
+      subject: e.assignment.subject, className: e.assignment.className,
+      teacherName: `${e.assignment.teacher.firstName} ${e.assignment.teacher.lastName}`,
+      questionCount: e._count.questions, duration: e.duration, totalMarks: e.totalMarks,
+      createdAt: e.createdAt,
+    })));
+  } catch (error) {
+    console.error('[Admin Questions Exams Error]', error);
+    res.status(500).json({ error: 'Failed to load exams' });
+  }
+});
+
+// ============================================================
+// 16. GET /questions/:examId — View questions for an exam
+// ============================================================
+router.get('/questions/:examId', async (req, res) => {
+  try {
+    const exam = await prisma.exam.findUnique({
+      where: { id: req.params.examId },
+      include: { assignment: { include: { teacher: { select: { firstName: true, lastName: true } } } } },
+    });
+    if (!exam) return res.status(404).json({ error: 'Exam not found' });
+    const questions = await prisma.examQuestion.findMany({
+      where: { examId: req.params.examId },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json({
+      exam: { id: exam.id, title: exam.title, status: exam.status, subject: exam.assignment.subject, className: exam.assignment.className },
+      questions,
+    });
+  } catch (error) {
+    console.error('[Admin View Questions Error]', error);
+    res.status(500).json({ error: 'Failed to load questions' });
+  }
+});
+
+// ============================================================
+// 17. POST /questions/upload — CSV upload (admin, any DRAFT exam)
+// ============================================================
+router.post('/questions/upload', upload.single('file'), async (req, res) => {
+  try {
+    const { examId } = req.body;
+    if (!examId) return res.status(400).json({ error: 'examId is required.' });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+    const exam = await prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) return res.status(404).json({ error: 'Exam not found.' });
+    if (exam.status !== 'DRAFT') return res.status(400).json({ error: 'Only DRAFT exams can be modified.' });
+    const parsed = parseCSV(req.file.buffer);
+    if (parsed.error) return res.status(400).json({ error: parsed.error });
+    const errors = [];
+    const validQuestions = [];
+    for (const row of parsed.rows) {
+      if (row._parseError) { errors.push(row._parseError); continue; }
+      const result = validateQuestion(row, row._rawIndex);
+      if (result.valid) validQuestions.push({ examId, ...result.data });
+      else errors.push(...result.errors);
+    }
+    let created = [];
+    if (validQuestions.length > 0) {
+      created = await prisma.$transaction(validQuestions.map(q => prisma.examQuestion.create({ data: q })));
+    }
+    res.status(201).json({ success: true, data: { total: parsed.rows.length, created: created.length, errors } });
+  } catch (error) {
+    console.error('[Admin Upload Questions Error]', error);
+    res.status(500).json({ error: 'Failed to upload questions.' });
+  }
+});
+
+// ============================================================
+// 18. POST /questions/manual — Manual question creation (admin)
+// ============================================================
+router.post('/questions/manual', async (req, res) => {
+  try {
+    const { examId, questions } = req.body;
+    if (!examId) return res.status(400).json({ error: 'examId is required.' });
+    if (!Array.isArray(questions) || questions.length === 0) return res.status(400).json({ error: 'questions must be a non-empty array.' });
+    if (questions.length > 500) return res.status(400).json({ error: 'Max 500 questions at once.' });
+    const exam = await prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) return res.status(404).json({ error: 'Exam not found.' });
+    if (exam.status !== 'DRAFT') return res.status(400).json({ error: 'Only DRAFT exams can be modified.' });
+    const validationErrors = [];
+    const validQuestions = [];
+    for (let i = 0; i < questions.length; i++) {
+      const result = validateQuestion(questions[i], i + 1);
+      if (result.valid) validQuestions.push({ examId, ...result.data });
+      else validationErrors.push(...result.errors);
+    }
+    if (validQuestions.length === 0) return res.status(400).json({ error: 'No valid questions.', errors: validationErrors });
+    const created = await prisma.$transaction(validQuestions.map(q => prisma.examQuestion.create({ data: q })));
+    res.status(201).json({ success: true, message: `${created.length} question(s) created.`, data: { count: created.length, examId }, ...(validationErrors.length > 0 && { warnings: { errors: validationErrors } }) });
+  } catch (error) {
+    console.error('[Admin Manual Questions Error]', error);
+    res.status(500).json({ error: 'Failed to add questions.' });
+  }
+});
+
+// ============================================================
+// 19. DELETE /questions/:questionId — Delete a question (admin)
+// ============================================================
+router.delete('/questions/:questionId', async (req, res) => {
+  try {
+    const question = await prisma.examQuestion.findUnique({
+      where: { id: req.params.questionId },
+      include: { exam: true },
+    });
+    if (!question) return res.status(404).json({ error: 'Question not found.' });
+    if (question.exam.status !== 'DRAFT') return res.status(400).json({ error: 'Cannot delete questions from a published exam.' });
+    await prisma.examQuestion.delete({ where: { id: req.params.questionId } });
+    res.json({ message: 'Question deleted.' });
+  } catch (error) {
+    console.error('[Admin Delete Question Error]', error);
+    res.status(500).json({ error: 'Failed to delete question.' });
   }
 });
 
