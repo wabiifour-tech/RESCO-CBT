@@ -1,10 +1,41 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
-const prisma = new PrismaClient();
+
+// ── Retry helper: wait for database to be reachable ──
+async function connectWithRetry(maxRetries = 15, baseDelayMs = 2000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const prisma = new PrismaClient({
+        datasources: {
+          db: {
+            url: process.env.DATABASE_URL,
+          },
+        },
+      });
+      await prisma.$connect();
+      console.log(`✅ Database connected (attempt ${attempt}/${maxRetries})`);
+      return prisma;
+    } catch (err) {
+      console.warn(`⏳ DB connection attempt ${attempt}/${maxRetries} failed: ${err.message}`);
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(1.5, attempt - 1);
+        console.log(`   Retrying in ${Math.round(delay / 1000)}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } else {
+        throw new Error(
+          `Database unreachable after ${maxRetries} attempts. Last error: ${err.message}`
+        );
+      }
+    }
+  }
+}
 
 async function seed() {
   console.log('Seeding RESCO CBT database...');
 
+  const prisma = await connectWithRetry();
+
+  // ── Admin account ──
   const adminEmail = process.env.ADMIN_EMAIL;
   const adminPass = process.env.ADMIN_PASSWORD;
 
@@ -69,8 +100,12 @@ async function seed() {
   console.log('Sample student created: full name=John Okafor, password=student123');
 
   console.log('Database seeding complete.');
+
+  await prisma.$disconnect();
 }
 
-seed()
-  .catch((e) => { console.error('Seed error:', e); process.exit(1); })
-  .finally(() => prisma.$disconnect());
+seed().catch((e) => {
+  console.error('❌ Seed failed (non-fatal — server will start anyway):', e.message);
+  // Exit 0 so nixpacks continues to start server.js
+  process.exit(0);
+});

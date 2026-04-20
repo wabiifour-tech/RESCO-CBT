@@ -1,10 +1,5 @@
 require('dotenv').config();
 
-// Ensure DATABASE_URL has a default for local development
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'file:./prisma/dev.db';
-}
-
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -177,15 +172,27 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, async () => {
-  try {
-    await prisma.$connect();
-    console.log('✅ Database connected successfully.');
-  } catch (dbError) {
-    console.error('❌ Failed to connect to the database:', dbError.message);
-    process.exit(1);
+// Retry logic for database connection
+async function connectWithRetry(maxRetries = 20, baseDelayMs = 2000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await prisma.$connect();
+      console.log(`✅ Database connected successfully (attempt ${attempt}/${maxRetries})`);
+      return;
+    } catch (err) {
+      console.warn(`⏳ DB connection attempt ${attempt}/${maxRetries} failed: ${err.message}`);
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(1.3, attempt - 1);
+        console.log(`   Retrying in ${Math.round(delay / 1000)}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
   }
+  console.error(`❌ Database unreachable after ${maxRetries} retries. Server will start but DB queries will fail.`);
+}
 
+const server = app.listen(PORT, async () => {
+  await connectWithRetry();
   console.log(`🚀 RESCO CBT Server running on port ${PORT} [${process.env.NODE_ENV || 'development'} mode]`);
   console.log(`   Health check: http://localhost:${PORT}/api/health`);
 });

@@ -1,1 +1,1 @@
-web: npx prisma db push --skip-generate --accept-data-loss 2>/dev/null; node prisma/seed.js; node src/server.js
+web: npx prisma db push --skip-generate --accept-data-loss 2>/dev/null || true; node prisma/seed.js || true; node src/server.js
