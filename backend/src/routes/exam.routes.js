@@ -304,6 +304,7 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
         subject: exam.assignment.subject,
       },
       questions: formattedQuestions,
+      examStartTime: now.toISOString(),
     });
   } catch (error) {
     console.error('Get exam questions error:', error);

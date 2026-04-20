@@ -90,6 +90,7 @@ router.get('/teachers', async (req, res) => {
       where.OR = [
         { firstName: { contains: term } },
         { lastName: { contains: term } },
+        { username: { contains: term } },
         { user: { email: { contains: term } } },
       ];
     }
@@ -113,6 +114,7 @@ router.get('/teachers', async (req, res) => {
         id: t.id,
         firstName: t.firstName,
         lastName: t.lastName,
+        username: t.username,
         email: t.user.email,
         status: t.status,
         subjects: JSON.parse(t.subjects || '[]'),
@@ -130,6 +132,79 @@ router.get('/teachers', async (req, res) => {
   } catch (error) {
     console.error('[Admin List Teachers Error]', error);
     res.status(500).json({ error: 'Failed to list teachers' });
+  }
+});
+
+// ============================================================
+// 2b. POST /teachers/create — Create Teacher
+// ============================================================
+router.post('/teachers/create', async (req, res) => {
+  try {
+    const { firstName, lastName, username, password } = req.body;
+
+    if (!firstName || !lastName || !username || !password) {
+      return res.status(400).json({
+        error: 'Missing required fields: firstName, lastName, username, password',
+      });
+    }
+
+    const trimmedUsername = username.trim().toLowerCase();
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    // Check username uniqueness
+    const existingTeacher = await prisma.teacher.findUnique({
+      where: { username: trimmedUsername },
+    });
+    if (existingTeacher) {
+      return res.status(409).json({ error: 'A teacher with this username already exists' });
+    }
+
+    // Generate a unique email from username (required by User model)
+    const generatedEmail = `${trimmedUsername}@resco.local`;
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const teacher = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: generatedEmail,
+          password: hashedPassword,
+          role: 'TEACHER',
+        },
+      });
+
+      return tx.teacher.create({
+        data: {
+          id: user.id,
+          firstName: trimmedFirstName,
+          lastName: trimmedLastName,
+          username: trimmedUsername,
+          status: 'ACTIVE',
+          subjects: '[]',
+        },
+        include: {
+          user: { select: { email: true, createdAt: true } },
+        },
+      });
+    });
+
+    res.status(201).json({
+      id: teacher.id,
+      firstName: teacher.firstName,
+      lastName: teacher.lastName,
+      username: teacher.username,
+      status: teacher.status,
+      createdAt: teacher.createdAt,
+      message: 'Teacher created successfully',
+    });
+  } catch (error) {
+    console.error('[Admin Create Teacher Error]', error);
+    res.status(500).json({ error: 'Failed to create teacher' });
   }
 });
 

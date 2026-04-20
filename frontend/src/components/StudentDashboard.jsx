@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import useAuthStore from '../store/authStore';
 import toast from 'react-hot-toast';
+import LiveClock from './LiveClock';
+import DailyDevotional from './DailyDevotional';
 import {
   LogOut, BookOpen, Clock, Award, Star, Lightbulb,
   ChevronRight, ChevronLeft, CheckCircle, XCircle,
-  Trophy, Target, Sparkles, Brain, Timer, RotateCcw
+  Trophy, Target, Sparkles, Brain, Timer, RotateCcw, AlertTriangle, BookMarked, Monitor, ShieldCheck, Users
 } from 'lucide-react';
 
 const EXAM_TIPS = [
@@ -15,6 +17,15 @@ const EXAM_TIPS = [
   "Eliminate wrong answers first to improve your chances",
   "Answer easy questions first, then come back to difficult ones",
   "Double-check your answers before submitting",
+];
+
+const EXAM_INSTRUCTIONS = [
+  { icon: Monitor, title: 'Device Readiness', desc: 'Ensure your device is fully charged or plugged in. Close all other applications and browser tabs before starting the exam.' },
+  { icon: ShieldCheck, title: 'Academic Integrity', desc: 'Do not open other tabs, applications, or use any unauthorized materials during the exam. All submissions are monitored.' },
+  { icon: Clock, title: 'Time Management', desc: 'The exam timer starts when you begin. Keep an eye on the timer. Unanswered questions will be submitted as-is when time runs out.' },
+  { icon: BookMarked, title: 'Answer Review', desc: 'You can navigate between questions freely before submitting. Use the question navigator to track your progress and review answers.' },
+  { icon: AlertTriangle, title: 'Submission', desc: 'Once you click Submit, you cannot change your answers. Make sure you have reviewed all questions before submitting.' },
+  { icon: Users, title: 'No Collaboration', desc: 'This is an individual assessment. Do not communicate with other students during the exam period.' },
 ];
 
 const OPTION_COLORS = {
@@ -222,6 +233,7 @@ export default function StudentDashboard() {
       const res = await api.get('/exams/' + examId + '/questions');
       const exam = res.data.exam;
       const qs = res.data.questions;
+      const examStartTime = res.data.examStartTime;
 
       // Shuffle options for each question
       const shuffledQuestions = qs.map(function (q) {
@@ -235,6 +247,7 @@ export default function StudentDashboard() {
       setCurrentQuestion(0);
       setTimeLeft(exam.duration * 60);
       startTimeRef.current = Date.now();
+      if (examStartTime) startTimeRef.current = new Date(examStartTime).getTime();
       setExamResult(null);
       setView('exam');
     } catch (err) {
@@ -876,7 +889,8 @@ export default function StudentDashboard() {
               <p className="text-xs text-gray-400 font-medium">Student Portal</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <LiveClock compact />
             <div className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-2 rounded-xl border border-indigo-100">
               <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
                 {studentName.charAt(0).toUpperCase()}
@@ -943,6 +957,38 @@ export default function StudentDashboard() {
               })}
             </div>
           </div>
+        </div>
+
+        {/* Exam Instructions */}
+        <div className="anim-fade-in mb-6" style={{ animationDelay: '0.12s' }}>
+          <details style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <summary style={{ padding: '14px 20px', cursor: 'pointer', fontSize: 16, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', background: 'linear-gradient(135deg, #fef3c7, #fde68a)' }}>
+              <AlertTriangle size={20} style={{ color: '#d97706' }} />
+              Exam Instructions & Guidelines
+              <span style={{ marginLeft: 'auto', fontSize: 12, color: '#92400e', fontWeight: 600 }}>Click to expand</span>
+            </summary>
+            <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+              {EXAM_INSTRUCTIONS.map(function (inst, i) {
+                var InstIcon = inst.icon;
+                return (
+                  <div key={i} style={{ display: 'flex', gap: 12, padding: 12, borderRadius: 12, background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <InstIcon size={20} style={{ color: '#fff' }} />
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', margin: '0 0 3px 0' }}>{inst.title}</p>
+                      <p style={{ fontSize: 12, color: '#64748b', margin: 0, lineHeight: 1.5 }}>{inst.desc}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </details>
+        </div>
+
+        {/* Daily Devotional */}
+        <div className="anim-fade-in mb-6" style={{ animationDelay: '0.13s' }}>
+          <DailyDevotional />
         </div>
 
         {/* Quick Stats */}

@@ -11,26 +11,39 @@ const router = express.Router();
 // ──────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
-    const { email, fullName, password } = req.body;
+    const { email, username, fullName, password } = req.body;
 
-    if ((!email && !fullName) || !password) {
+    if (!password) {
       return res.status(400).json({
         success: false,
-        message: 'Email or full name and password are required.',
+        message: 'Password is required.',
       });
     }
 
     let user;
 
+    // Admin login via email (from env vars)
     if (email && email.includes('@')) {
-      // Admin login via email
       user = await prisma.user.findUnique({
         where: { email: email.toLowerCase() },
         include: { student: true, teacher: true },
       });
-    } else {
-      // Student/Teacher login via full name
-      const name = (fullName || email || '').trim().toLowerCase();
+    } else if (username) {
+      // Teacher login via username
+      const teacher = await prisma.teacher.findUnique({
+        where: { username: username.trim().toLowerCase() },
+        include: { user: true },
+      });
+
+      if (teacher) {
+        user = {
+          ...teacher.user,
+          teacher,
+        };
+      }
+    } else if (fullName) {
+      // Student login via full name
+      const name = fullName.trim().toLowerCase();
       const parts = name.split(/\s+/);
 
       if (parts.length < 2) {
@@ -40,7 +53,6 @@ router.post('/login', async (req, res) => {
         });
       }
 
-      // Try to match by student first, then teacher
       user = await prisma.user.findFirst({
         where: {
           role: 'STUDENT',
@@ -51,25 +63,17 @@ router.post('/login', async (req, res) => {
         },
         include: { student: true, teacher: true },
       });
-
-      if (!user) {
-        user = await prisma.user.findFirst({
-          where: {
-            role: 'TEACHER',
-            teacher: {
-              firstName: { equals: parts[0], mode: 'insensitive' },
-              lastName: { equals: parts[parts.length - 1], mode: 'insensitive' },
-            },
-          },
-          include: { student: true, teacher: true },
-        });
-      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email (admin), username (teacher), or full name (student).',
+      });
     }
 
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid name or password.',
+        message: 'Invalid credentials.',
       });
     }
 
@@ -77,11 +81,11 @@ router.post('/login', async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid name or password.',
+        message: 'Invalid credentials.',
       });
     }
 
-    // Block teachers who have not been approved yet
+    // Block teachers who are not active
     if (user.role === 'TEACHER' && user.teacher && user.teacher.status === 'PENDING') {
       return res.status(403).json({
         success: false,
@@ -89,7 +93,6 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Block rejected teachers
     if (user.role === 'TEACHER' && user.teacher && user.teacher.status === 'REJECTED') {
       return res.status(403).json({
         success: false,
@@ -121,6 +124,7 @@ router.post('/login', async (req, res) => {
         id: user.teacher.id,
         firstName: user.teacher.firstName,
         lastName: user.teacher.lastName,
+        username: user.teacher.username,
         status: user.teacher.status,
         subjects: JSON.parse(user.teacher.subjects || '[]'),
       };
@@ -136,85 +140,6 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'An error occurred during login. Please try again.',
-    });
-  }
-});
-
-// ──────────────────────────────────────────────
-// POST /teacher-signup
-// ──────────────────────────────────────────────
-router.post('/teacher-signup', async (req, res) => {
-  try {
-    const { email, password, firstName, lastName, subjects } = req.body;
-
-    // Validate required fields
-    if (!email || !password || !firstName || !lastName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email, password, firstName, and lastName are required.',
-      });
-    }
-
-    // Basic password strength check
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must be at least 6 characters long.',
-      });
-    }
-
-    // Check for existing email
-    const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
-
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: 'A user with this email already exists.',
-      });
-    }
-
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create User + Teacher in a single transaction (Teacher.id must equal User.id)
-    const newUser = await prisma.$transaction(async (tx) => {
-      const createdUser = await tx.user.create({
-        data: {
-          email: email.toLowerCase(),
-          password: hashedPassword,
-          role: 'TEACHER',
-        },
-      });
-
-      await tx.teacher.create({
-        data: {
-          id: createdUser.id,
-          firstName,
-          lastName,
-          subjects: JSON.stringify(subjects || []),
-          status: 'PENDING',
-        },
-      });
-
-      return createdUser;
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: 'Registration successful. Waiting for admin approval.',
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        role: newUser.role,
-      },
-    });
-  } catch (error) {
-    console.error('Teacher signup error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred during registration. Please try again.',
     });
   }
 });
@@ -252,7 +177,6 @@ router.post('/change-password', authenticate, async (req, res) => {
       });
     }
 
-    // Verify current password
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
       return res.status(401).json({
@@ -261,7 +185,6 @@ router.post('/change-password', authenticate, async (req, res) => {
       });
     }
 
-    // Prevent reusing the same password
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
       return res.status(400).json({
@@ -309,7 +232,6 @@ router.get('/me', authenticate, async (req, res) => {
       });
     }
 
-    // Build safe profile (never expose the password hash)
     const profile = {
       id: user.id,
       email: user.email,
@@ -333,6 +255,7 @@ router.get('/me', authenticate, async (req, res) => {
         id: user.teacher.id,
         firstName: user.teacher.firstName,
         lastName: user.teacher.lastName,
+        username: user.teacher.username,
         status: user.teacher.status,
         subjects: JSON.parse(user.teacher.subjects || '[]'),
       };
@@ -355,9 +278,6 @@ router.get('/me', authenticate, async (req, res) => {
 // POST /logout
 // ──────────────────────────────────────────────
 router.post('/logout', (req, res) => {
-  // Stateless JWT — the client is responsible for discarding the token.
-  // Optionally, the client can send the token in the body or
-  // Authorization header so the response confirms the intent.
   return res.status(200).json({
     success: true,
     message: 'Logged out successfully.',

@@ -20,7 +20,7 @@ async function seed() {
     console.log('ADMIN_EMAIL and ADMIN_PASSWORD not set. Skipping admin creation.');
   }
 
-  console.log('Database ready.');
+  console.log('Database ready. No default students, teachers, exams, or questions created.');
 }
 
 seed()

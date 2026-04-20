@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import useAuthStore from '../store/authStore';
 import toast from 'react-hot-toast';
+import LiveClock from './LiveClock';
+import DailyDevotional from './DailyDevotional';
 import {
   LogOut, BookOpen, Users, UserCheck, UserX, UserPlus, BarChart3, Trash2,
   X, Eye, Shield, GraduationCap, TrendingUp, Clock, CheckCircle, XCircle,
@@ -101,7 +103,7 @@ export default function AdminPanel() {
   const [showStudentModal, setShowStudentModal] = useState(false);
 
   // Form data
-  const [teacherForm, setTeacherForm] = useState({ firstName: '', lastName: '', email: '', password: '', subjects: '', status: 'PENDING' });
+  const [teacherForm, setTeacherForm] = useState({ firstName: '', lastName: '', username: '', password: '' });
   const [studentForm, setStudentForm] = useState({ firstName: '', lastName: '', admissionNo: '', className: '', email: '', password: '' });
 
   // ─── Fetch helpers ─────────────────────────────────────────────────────────
@@ -118,7 +120,7 @@ export default function AdminPanel() {
     setLoading(true);
     try {
       const res = await api.get('/admin/teachers');
-      setTeachers(res.data);
+      setTeachers(res.data.teachers || []);
     } catch (err) {
       toast.error('Failed to load teachers');
     } finally {
@@ -130,7 +132,7 @@ export default function AdminPanel() {
     setLoading(true);
     try {
       const res = await api.get('/admin/students');
-      setStudents(res.data);
+      setStudents(res.data.students || []);
     } catch (err) {
       toast.error('Failed to load students');
     } finally {
@@ -142,7 +144,7 @@ export default function AdminPanel() {
     setLoading(true);
     try {
       const res = await api.get('/admin/assignments');
-      setAssignments(res.data);
+      setAssignments(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       toast.error('Failed to load assignments');
     } finally {
@@ -179,22 +181,19 @@ export default function AdminPanel() {
 
   const handleCreateTeacher = async (e) => {
     e.preventDefault();
-    const subjects = teacherForm.subjects.split(',').map((s) => s.trim()).filter(Boolean);
     try {
       await api.post('/admin/teachers/create', {
         firstName: teacherForm.firstName,
         lastName: teacherForm.lastName,
-        email: teacherForm.email,
+        username: teacherForm.username,
         password: teacherForm.password,
-        subjects: subjects,
-        status: teacherForm.status,
       });
       toast.success('Teacher created successfully');
       setShowTeacherModal(false);
-      setTeacherForm({ firstName: '', lastName: '', email: '', password: '', subjects: '', status: 'PENDING' });
+      setTeacherForm({ firstName: '', lastName: '', username: '', password: '' });
       fetchTeachers();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create teacher');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to create teacher');
     }
   };
 
@@ -276,7 +275,8 @@ export default function AdminPanel() {
     const q = teacherSearch.toLowerCase();
     return (
       (t.firstName + ' ' + t.lastName).toLowerCase().includes(q) ||
-      t.email.toLowerCase().includes(q)
+      (t.username || '').toLowerCase().includes(q) ||
+      (t.email || '').toLowerCase().includes(q)
     );
   });
 
@@ -440,7 +440,7 @@ export default function AdminPanel() {
         <Search size={17} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
         <input
           type="text"
-          placeholder="Search teachers by name or email..."
+          placeholder="Search teachers by name, username..."
           value={teacherSearch}
           onChange={(e) => setTeacherSearch(e.target.value)}
           style={{
@@ -471,7 +471,7 @@ export default function AdminPanel() {
           }}>
             {filteredTeachers.map((t, idx) => (
               <div
-                key={t._id || idx}
+                key={t.id || idx}
                 style={{
                   ...cardBase,
                   padding: 20,
@@ -492,7 +492,7 @@ export default function AdminPanel() {
                     </div>
                     <div>
                       <p style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>{t.firstName} {t.lastName}</p>
-                      <p style={{ fontSize: 13, color: '#64748b', margin: '2px 0 0 0' }}>{t.email}</p>
+                      <p style={{ fontSize: 13, color: '#64748b', margin: '2px 0 0 0' }}>@{t.username || t.email}</p>
                     </div>
                   </div>
                   {renderStatusBadge(t.status)}
@@ -513,7 +513,7 @@ export default function AdminPanel() {
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {t.status === 'PENDING' && (
                     <button
-                      onClick={() => handleApproveTeacher(t._id)}
+                      onClick={() => handleApproveTeacher(t.id)}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 5,
                         padding: '7px 14px', borderRadius: 8, border: 'none',
@@ -529,7 +529,7 @@ export default function AdminPanel() {
                   )}
                   {t.status !== 'REJECTED' && (
                     <button
-                      onClick={() => handleRejectTeacher(t._id)}
+                      onClick={() => handleRejectTeacher(t.id)}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 5,
                         padding: '7px 14px', borderRadius: 8, border: 'none',
@@ -544,7 +544,7 @@ export default function AdminPanel() {
                     </button>
                   )}
                   <button
-                    onClick={() => handleDeleteTeacher(t._id)}
+                    onClick={() => handleDeleteTeacher(t.id)}
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 5,
                       padding: '7px 14px', borderRadius: 8, border: 'none',
@@ -628,7 +628,7 @@ export default function AdminPanel() {
           }}>
             {filteredStudents.map((s, idx) => (
               <div
-                key={s._id || idx}
+                key={s.id || idx}
                 style={{
                   ...cardBase,
                   padding: 20,
@@ -671,7 +671,7 @@ export default function AdminPanel() {
                 </div>
 
                 <button
-                  onClick={() => handleDeleteStudent(s._id)}
+                  onClick={() => handleDeleteStudent(s.id)}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 5,
                     padding: '7px 14px', borderRadius: 8, border: 'none',
@@ -737,7 +737,7 @@ export default function AdminPanel() {
 
             {assignments.map((a, idx) => (
               <div
-                key={a._id || idx}
+                key={a.id || idx}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '2fr 1.5fr 1fr 1fr 80px',
@@ -774,7 +774,7 @@ export default function AdminPanel() {
                   </span>
                 </span>
                 <button
-                  onClick={() => handleDeleteAssignment(a._id)}
+                  onClick={() => handleDeleteAssignment(a.id)}
                   style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     width: 34, height: 34, borderRadius: 8, border: 'none',
@@ -1071,14 +1071,14 @@ export default function AdminPanel() {
           />
         </div>
         <div>
-          <label style={labelStyle}>Email</label>
+          <label style={labelStyle}>Username</label>
           <input
-            type="email"
+            type="text"
             required
-            value={teacherForm.email}
-            onChange={(e) => setTeacherForm({ ...teacherForm, email: e.target.value })}
+            value={teacherForm.username}
+            onChange={(e) => setTeacherForm({ ...teacherForm, username: e.target.value })}
             style={inputStyle}
-            placeholder="teacher@resco.edu.ng"
+            placeholder="e.g. mrjohnson"
             onFocus={(e) => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.background = '#fff'; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
           />
@@ -1097,22 +1097,8 @@ export default function AdminPanel() {
           />
         </div>
         <div>
-          <label style={labelStyle}>Subjects (comma separated)</label>
-          <input
-            type="text"
-            required
-            value={teacherForm.subjects}
-            onChange={(e) => setTeacherForm({ ...teacherForm, subjects: e.target.value })}
-            style={inputStyle}
-            placeholder="Mathematics, English, Physics"
-            onFocus={(e) => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.background = '#fff'; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
-          />
-        </div>
-        <div>
           <label style={labelStyle}>Status</label>
           <select
-            value={teacherForm.status}
             onChange={(e) => setTeacherForm({ ...teacherForm, status: e.target.value })}
             style={{
               ...inputStyle,
@@ -1287,7 +1273,7 @@ export default function AdminPanel() {
             flexShrink: 0,
           }}>
             <img
-              src="/logo.png"
+              src="/resco-logo.png"
               alt="RESCO CBT"
               style={{ width: 34, height: 34, objectFit: 'contain' }}
               onError={(e) => {
@@ -1382,6 +1368,11 @@ export default function AdminPanel() {
               </p>
               <p style={{ fontSize: 11, margin: '2px 0 0 0', opacity: 0.6 }}>Administrator</p>
             </div>
+          </div>
+
+          {/* Live Clock */}
+          <div style={{ marginBottom: 10 }}>
+            <LiveClock compact />
           </div>
 
           {/* Logout */}

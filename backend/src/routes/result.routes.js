@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { requireRole, requireTeacherActive } = require('../middleware/roleMiddleware');
+const PDFDocument = require('pdfkit');
 
 const router = express.Router();
 
@@ -11,13 +12,14 @@ const router = express.Router();
 
 router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) => {
   try {
-    const { examId, answers, timeSpent } = req.body;
+    const { examId, answers, timeSpent, examStartTime } = req.body;
 
     if (!examId || !answers || !Array.isArray(answers)) {
       return res.status(400).json({ success: false, message: 'Missing required fields: examId, answers.' });
     }
 
     const studentId = req.user.userId;
+    const now = new Date();
 
     // Verify exam is published and accessible
     const exam = await prisma.exam.findUnique({
@@ -68,6 +70,8 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
     const percentage = totalMarks > 0 ? (score / totalMarks) * 100 : 0;
     const passed = percentage >= exam.passMark;
 
+    const startTime = examStartTime ? new Date(examStartTime) : now;
+
     // Create result and answers in transaction
     const result = await prisma.$transaction(async (tx) => {
       const newResult = await tx.result.create({
@@ -78,6 +82,8 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
           totalMarks,
           percentage: Math.round(percentage * 100) / 100,
           timeSpent: timeSpent || 0,
+          examStartTime: startTime,
+          examEndTime: now,
         },
       });
 
@@ -103,6 +109,8 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
         percentage: Math.round(percentage * 100) / 100,
         passed,
         timeSpent: timeSpent || 0,
+        examStartTime: startTime,
+        examEndTime: now,
         submittedAt: result.submittedAt,
       },
     };
@@ -173,7 +181,6 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
       return res.status(404).json({ success: false, message: 'Result not found.' });
     }
 
-    // Check result visibility
     if (result.exam.resultVisibility === 'AFTER_CLOSE' && new Date(result.exam.endDate) > new Date()) {
       return res.status(200).json({
         success: true,
@@ -183,6 +190,8 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
           totalMarks: result.totalMarks,
           percentage: result.percentage,
           submittedAt: result.submittedAt,
+          examStartTime: result.examStartTime,
+          examEndTime: result.examEndTime,
           message: 'Detailed answers will be available after the exam closes.',
           showDetails: false,
         },
@@ -197,14 +206,13 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
 });
 
 // ========================================
-// TEACHER: Get Exam Results
+// TEACHER: Get Exam Results (with exam times)
 // ========================================
 
 router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) => {
   try {
     const { examId, className, page = 1, limit = 20 } = req.query;
 
-    // Get teacher's assignments
     const assignments = await prisma.teacherAssignment.findMany({
       where: { teacherId: req.user.userId },
       select: { id: true },
@@ -274,7 +282,6 @@ router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER'), asy
   try {
     const { examId } = req.params;
 
-    // Verify exam belongs to teacher
     const exam = await prisma.exam.findFirst({
       where: { id: examId, assignment: { teacherId: req.user.userId } },
     });
@@ -292,7 +299,6 @@ router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER'), asy
       orderBy: { percentage: 'desc' },
     });
 
-    // Question-level stats
     const questions = await prisma.examQuestion.findMany({
       where: { examId },
     });
@@ -327,18 +333,23 @@ router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER'), asy
 });
 
 // ========================================
-// TEACHER: Export Results
+// TEACHER: Export Results as Watermarked PDF
 // ========================================
 
 router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, res) => {
   try {
     const { examId } = req.params;
-    const { format = 'csv' } = req.query;
+    const { format } = req.query;
 
     // Verify exam belongs to teacher
     const exam = await prisma.exam.findFirst({
       where: { id: examId, assignment: { teacherId: req.user.userId } },
-      include: { assignment: { select: { subject: true, className: true } } },
+      include: {
+        assignment: {
+          select: { subject: true, className: true },
+          include: { teacher: { select: { firstName: true, lastName: true } } },
+        },
+      },
     });
 
     if (!exam) {
@@ -357,48 +368,10 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
       return res.status(404).json({ success: false, message: 'No results found for this exam.' });
     }
 
-    const filename = `${exam.title.replace(/[^a-zA-Z0-9]/g, '_')}_results`;
-
-    if (format === 'xlsx') {
-      // Use ExcelJS for Excel export
-      const ExcelJS = require('exceljs');
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('Results');
-
-      worksheet.columns = [
-        { header: 'Admission No', key: 'admissionNo', width: 20 },
-        { header: 'First Name', key: 'firstName', width: 15 },
-        { header: 'Last Name', key: 'lastName', width: 15 },
-        { header: 'Class', key: 'className', width: 12 },
-        { header: 'Score', key: 'score', width: 10 },
-        { header: 'Total Marks', key: 'totalMarks', width: 12 },
-        { header: 'Percentage', key: 'percentage', width: 12 },
-        { header: 'Time Spent (min)', key: 'timeSpent', width: 15 },
-        { header: 'Submitted At', key: 'submittedAt', width: 22 },
-      ];
-
-      results.forEach(r => {
-        worksheet.addRow({
-          admissionNo: r.student.admissionNo,
-          firstName: r.student.firstName,
-          lastName: r.student.lastName,
-          className: r.student.className,
-          score: r.score,
-          totalMarks: r.totalMarks,
-          percentage: `${r.percentage}%`,
-          timeSpent: Math.round(r.timeSpent / 60),
-          submittedAt: r.submittedAt.toISOString().replace('T', ' ').substring(0, 19),
-        });
-      });
-
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
-
-      await workbook.xlsx.write(res);
-      res.end();
-    } else {
-      // CSV export
-      const headers = ['Admission No', 'First Name', 'Last Name', 'Class', 'Score', 'Total Marks', 'Percentage', 'Time Spent (min)', 'Submitted At'];
+    // CSV format
+    if (format === 'csv') {
+      const filename = `${exam.title.replace(/[^a-zA-Z0-9]/g, '_')}_results`;
+      const headers = ['Admission No', 'First Name', 'Last Name', 'Class', 'Score', 'Total Marks', 'Percentage', 'Time Spent (min)', 'Exam Start Time', 'Exam End Time', 'Submitted At'];
       const rows = results.map(r => [
         r.student.admissionNo,
         r.student.firstName,
@@ -408,15 +381,176 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
         r.totalMarks,
         `${r.percentage}%`,
         Math.round(r.timeSpent / 60),
+        r.examStartTime ? r.examStartTime.toISOString().replace('T', ' ').substring(0, 19) : '',
+        r.examEndTime ? r.examEndTime.toISOString().replace('T', ' ').substring(0, 19) : '',
         r.submittedAt.toISOString().replace('T', ' ').substring(0, 19),
       ]);
 
       const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
-      res.send(csv);
+      return res.send(csv);
     }
+
+    // PDF format with watermark
+    const teacherName = exam.assignment.teacher
+      ? `${exam.assignment.teacher.firstName} ${exam.assignment.teacher.lastName}`
+      : 'Teacher';
+    const subject = exam.assignment.subject;
+    const className = exam.assignment.className;
+
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 50, bottom: 50, left: 50, right: 50 },
+      info: {
+        Title: `${exam.title} - Results`,
+        Author: 'RESCO CBT System',
+        Subject: `${subject} - ${className}`,
+      },
+    });
+
+    const filename = `${exam.title.replace(/[^a-zA-Z0-9]/g, '_')}_results.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    doc.pipe(res);
+
+    const pageWidth = doc.page.width - 100; // margins
+
+    // Helper to draw watermark on each page
+    const drawWatermark = () => {
+      doc.save();
+      doc.fontSize(60).fillColor('#e0e0e0', 0.3);
+      doc.rotate(-45, { origin: [doc.page.width / 2, doc.page.height / 2] });
+      doc.text('RESCO CBT', doc.page.width / 2 - 150, doc.page.height / 2 - 30, {
+        width: 300,
+        align: 'center',
+      });
+      doc.restore();
+    };
+
+    // For each result, generate a PDF page
+    for (const result of results) {
+      doc.addPage();
+      drawWatermark();
+
+      const studentName = `${result.student.firstName} ${result.student.lastName}`;
+      const examDate = result.submittedAt.toLocaleDateString('en-NG', {
+        year: 'numeric', month: 'long', day: 'numeric',
+      });
+      const startTimeStr = result.examStartTime
+        ? result.examStartTime.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
+        : 'N/A';
+      const endTimeStr = result.examEndTime
+        ? result.examEndTime.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
+        : 'N/A';
+
+      // Header with gradient-like colored bar
+      doc.rect(0, 0, doc.page.width, 8)
+         .fill('#6366f1');
+      doc.rect(0, 8, doc.page.width, 3)
+         .fill('#8b5cf6');
+
+      // School name
+      doc.fontSize(16).fillColor('#1e1b4b').font('Helvetica-Bold')
+         .text("REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO", 50, 30, { align: 'center' });
+      doc.fontSize(10).fillColor('#4c1d95').font('Helvetica')
+         .text('Computer-Based Test Result', 50, 50, { align: 'center' });
+
+      // Decorative line
+      doc.moveTo(50, 68).lineTo(doc.page.width - 50, 68)
+         .strokeColor('#8b5cf6').lineWidth(1.5).stroke();
+
+      // Result title
+      doc.fontSize(14).fillColor('#1e1b4b').font('Helvetica-Bold')
+         .text(exam.title, 50, 80, { align: 'center' });
+
+      // Student info table
+      const tableTop = 110;
+      const col1 = 50;
+      const col2 = 250;
+      const rowH = 20;
+
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#4c1d95');
+      const fields = [
+        ['Student Name:', studentName],
+        ['Admission No:', result.student.admissionNo],
+        ['Class:', result.student.className],
+        ['Subject:', subject],
+        ['Date:', examDate],
+        ['Start Time:', startTimeStr],
+        ['End Time:', endTimeStr],
+      ];
+
+      fields.forEach((row, i) => {
+        const y = tableTop + i * rowH;
+        doc.font('Helvetica-Bold').fillColor('#374151').text(row[0], col1, y);
+        doc.font('Helvetica').fillColor('#1f2937').text(row[1], col2, y);
+      });
+
+      // Score box
+      const scoreTop = tableTop + fields.length * rowH + 15;
+      const scoreBoxWidth = pageWidth;
+
+      // Background for score
+      doc.roundedRect(col1, scoreTop, scoreBoxWidth, 80, 8)
+         .fill('#f5f3ff');
+
+      // Score display
+      const pct = Math.round(result.percentage);
+      const gradeColor = pct >= 50 ? '#059669' : '#dc2626';
+      const grade = pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : pct >= 50 ? 'E' : 'F';
+
+      doc.fontSize(11).fillColor('#4c1d95').font('Helvetica-Bold')
+         .text('Score:', col1 + 20, scoreTop + 10);
+      doc.fontSize(28).fillColor(gradeColor).font('Helvetica-Bold')
+         .text(`${result.score}/${result.totalMarks}`, col1 + 80, scoreTop + 5);
+      doc.fontSize(12).fillColor('#6b7280').font('Helvetica')
+         .text(`(${result.percentage}%)`, col1 + 80, scoreTop + 38);
+
+      doc.fontSize(11).fillColor('#4c1d95').font('Helvetica-Bold')
+         .text('Grade:', col1 + 230, scoreTop + 10);
+      doc.fontSize(28).fillColor(gradeColor).font('Helvetica-Bold')
+         .text(grade, col1 + 290, scoreTop + 5);
+
+      doc.fontSize(11).fillColor('#4c1d95').font('Helvetica-Bold')
+         .text('Status:', col1 + 370, scoreTop + 10);
+      const statusText = pct >= 50 ? 'PASSED' : 'FAILED';
+      const statusColor = pct >= 50 ? '#059669' : '#dc2626';
+      doc.fontSize(16).fillColor(statusColor).font('Helvetica-Bold')
+         .text(statusText, col1 + 430, scoreTop + 12);
+
+      // Time spent
+      const timeMins = Math.round(result.timeSpent / 60);
+      doc.fontSize(10).fillColor('#6b7280').font('Helvetica')
+         .text(`Time Spent: ${timeMins} minutes`, col1 + 20, scoreTop + 58);
+
+      // Signature section
+      const sigTop = scoreTop + 110;
+
+      // Principal signature line
+      doc.moveTo(col1, sigTop + 40).lineTo(col1 + 200, sigTop + 40)
+         .strokeColor('#374151').lineWidth(0.5).stroke();
+      doc.fontSize(10).fillColor('#374151').font('Helvetica')
+         .text('Principal', col1, sigTop + 48, { align: 'center', width: 200 });
+      doc.fontSize(10).fillColor('#6366f1').font('Helvetica-BoldOblique')
+         .text('Aderonke Rachael', col1, sigTop + 62, { align: 'center', width: 200 });
+
+      // Teacher signature line
+      doc.moveTo(col2 + 50, sigTop + 40).lineTo(col2 + 250, sigTop + 40)
+         .strokeColor('#374151').lineWidth(0.5).stroke();
+      doc.fontSize(10).fillColor('#374151').font('Helvetica')
+         .text('Teacher', col2 + 50, sigTop + 48, { align: 'center', width: 200 });
+      doc.fontSize(10).fillColor('#6366f1').font('Helvetica-BoldOblique')
+         .text(teacherName, col2 + 50, sigTop + 62, { align: 'center', width: 200 });
+
+      // Footer
+      doc.fontSize(7).fillColor('#9ca3af').font('Helvetica')
+         .text(`Generated by RESCO CBT System on ${new Date().toLocaleString()}`, 50, doc.page.height - 40, {
+           align: 'center', width: pageWidth,
+         });
+    }
+
+    doc.end();
   } catch (error) {
     console.error('Export results error:', error);
     res.status(500).json({ success: false, message: 'Failed to export results.' });

@@ -38,7 +38,8 @@ model Teacher {
   id        String  @id @default(uuid())
   firstName String  @map("first_name")
   lastName  String  @map("last_name")
-  status    String  @default("PENDING")
+  username  String  @unique
+  status    String  @default("ACTIVE")
   subjects  String  @default("[]")
 
   user        User               @relation(fields: [id], references: [id], onDelete: Cascade)
@@ -104,14 +105,16 @@ model ExamQuestion {
 }
 
 model Result {
-  id          String         @id @default(uuid())
-  examId      String         @map("exam_id")
-  studentId   String         @map("student_id")
-  score       Int
-  totalMarks  Int            @default(100) @map("total_marks")
-  percentage  Float          @default(0)
-  submittedAt DateTime       @default(now()) @map("submitted_at")
-  timeSpent   Int            @default(0) @map("time_spent")
+  id            String         @id @default(uuid())
+  examId        String         @map("exam_id")
+  studentId     String         @map("student_id")
+  score         Int
+  totalMarks    Int            @default(100) @map("total_marks")
+  percentage    Float          @default(0)
+  submittedAt   DateTime       @default(now()) @map("submitted_at")
+  timeSpent     Int            @default(0) @map("time_spent")
+  examStartTime DateTime       @default(now()) @map("exam_start_time")
+  examEndTime   DateTime       @default(now()) @map("exam_end_time")
 
   exam     Exam          @relation(fields: [examId], references: [id])
   student  Student       @relation(fields: [studentId], references: [id])

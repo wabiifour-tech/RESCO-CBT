@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import useAuthStore from '../store/authStore';
 import toast from 'react-hot-toast';
+import LiveClock from './LiveClock';
+import DailyDevotional from './DailyDevotional';
 import {
   LogOut, BookOpen, Plus, Upload, Eye, Edit3, Trash2, Download, ChevronDown, ChevronUp,
   X, Users, BarChart3, CheckCircle, Clock, FileText, AlertCircle
@@ -99,7 +101,8 @@ export default function TeacherDashboard() {
   };
 
   const handleExport = (examId, format = 'csv') => {
-    window.open(`/api/results/export/${examId}?format=${format}`, '_blank');
+    const baseUrl = import.meta.env.VITE_API_URL || 'https://resco-cbt-jwtsecret.up.railway.app/api';
+    window.open(baseUrl + '/results/export/' + examId + '?format=' + format, '_blank');
   };
 
   const viewExamResults = async (examId) => {
@@ -119,7 +122,8 @@ export default function TeacherDashboard() {
             <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center"><BookOpen className="w-5 h-5 text-white" /></div>
             <div><h1 className="font-bold text-gray-800">RESCO CBT</h1><p className="text-xs text-gray-500">Teacher Portal</p></div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <LiveClock compact />
             <span className="text-sm text-gray-600">Hello, <b>{user?.firstName}</b></span>
             <button onClick={() => { logout(); window.location.href = '/'; }} className="text-gray-400 hover:text-red-500"><LogOut className="w-5 h-5" /></button>
           </div>
@@ -140,6 +144,11 @@ export default function TeacherDashboard() {
               <div><p className="text-2xl font-bold">{value}</p><p className="text-sm text-gray-500">{label}</p></div>
             </div>
           ))}
+        </div>
+
+        {/* Daily Devotional */}
+        <div className="mb-4">
+          <DailyDevotional />
         </div>
 
         {/* Actions */}
