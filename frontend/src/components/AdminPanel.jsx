@@ -29,8 +29,9 @@ const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',   icon: BarChart3 },
   { id: 'teachers',    label: 'Teachers',    icon: UserCheck },
   { id: 'students',    label: 'Students',    icon: GraduationCap },
+  { id: 'exams',       label: 'Exams',       icon: BookOpen },
   { id: 'questions',   label: 'Questions',   icon: FileQuestion },
-  { id: 'assignments', label: 'Assignments', icon: BookOpen },
+  { id: 'assignments', label: 'Assignments', icon: Award },
   { id: 'analytics',   label: 'Analytics',   icon: TrendingUp },
 ];
 
@@ -93,9 +94,12 @@ export default function AdminPanel() {
   const [assignments, setAssignments] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [draftExams, setDraftExams] = useState([]);
+  const [allExams, setAllExams] = useState([]);
   const [selectedExamId, setSelectedExamId] = useState('');
   const [examQuestions, setExamQuestions] = useState([]);
   const [selectedExamInfo, setSelectedExamInfo] = useState(null);
+  const [showExamModal, setShowExamModal] = useState(false);
+  const [examForm, setExamForm] = useState({ assignmentId: '', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '' });
 
   // Search
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -189,6 +193,18 @@ export default function AdminPanel() {
     }
   }, []);
 
+  const fetchAllExams = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/admin/exams');
+      setAllExams(res.data.exams || []);
+    } catch (err) {
+      toast.error('Failed to load exams');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const fetchExamQuestions = useCallback(async (examId) => {
     setLoading(true);
     try {
@@ -210,7 +226,8 @@ export default function AdminPanel() {
     else if (activeTab === 'assignments') fetchAssignments();
     else if (activeTab === 'analytics') fetchAnalytics();
     else if (activeTab === 'questions') fetchDraftExams();
-  }, [activeTab, fetchDashboard, fetchTeachers, fetchStudents, fetchAssignments, fetchAnalytics, fetchDraftExams]);
+    else if (activeTab === 'exams') fetchAllExams();
+  }, [activeTab, fetchDashboard, fetchTeachers, fetchStudents, fetchAssignments, fetchAnalytics, fetchDraftExams, fetchAllExams]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleLogout = () => {
@@ -306,6 +323,56 @@ export default function AdminPanel() {
       fetchAssignments();
     } catch (err) {
       toast.error('Failed to delete assignment');
+    }
+  };
+
+  // ─── Exam Handlers ────────────────────────────────────────────────────
+  const handleCreateExam = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.post('/admin/exams/create', examForm);
+      toast.success(res.data.message);
+      setShowExamModal(false);
+      setExamForm({ assignmentId: '', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '' });
+      fetchAllExams();
+      fetchDraftExams();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to create exam');
+    }
+  };
+
+  const handlePublishExam = async (id) => {
+    if (!window.confirm('Publish this exam? Students will be able to take it.')) return;
+    try {
+      await api.patch('/admin/exams/' + id + '/publish');
+      toast.success('Exam published!');
+      fetchAllExams();
+      fetchDraftExams();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to publish exam');
+    }
+  };
+
+  const handleArchiveExam = async (id) => {
+    if (!window.confirm('Archive this exam? It will no longer be available to students.')) return;
+    try {
+      await api.patch('/admin/exams/' + id + '/archive');
+      toast.success('Exam archived.');
+      fetchAllExams();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to archive exam');
+    }
+  };
+
+  const handleDeleteExam = async (id) => {
+    if (!window.confirm('Delete this draft exam and all its questions?')) return;
+    try {
+      await api.delete('/admin/exams/' + id);
+      toast.success('Exam deleted.');
+      fetchAllExams();
+      fetchDraftExams();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete exam');
     }
   };
 
@@ -1354,7 +1421,7 @@ export default function AdminPanel() {
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {selectedExamId && (
               <>
-                <button onClick={() => setShowUploadModal(true)} style={btnSuccess}><Upload size={16} /> Upload CSV</button>
+                <button onClick={() => setShowUploadModal(true)} style={btnSuccess}><Upload size={16} /> Upload File</button>
                 <button onClick={() => setShowManualModal(true)} style={btnPrimary}><Plus size={16} /> Add Manually</button>
               </>
             )}
@@ -1444,15 +1511,15 @@ export default function AdminPanel() {
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
             <div style={{ ...cardBase, padding: 28, maxWidth: 460, width: '100%', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
               <button onClick={() => setShowUploadModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
-              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Upload Questions (CSV)</h2>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Upload Questions</h2>
               <form onSubmit={handleCSVUpload} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ border: '2px dashed #d1d5db', borderRadius: 12, padding: '28px 16px', textAlign: 'center', background: '#fafbfc' }}>
                   <Upload size={32} style={{ margin: '0 auto 8px', color: '#94a3b8' }} />
-                  <input type="file" accept=".csv" onChange={(e) => setUploadFile(e.target.files[0])} style={{ display: 'none' }} id="admin-csv-upload" />
+                  <input type="file" accept=".csv,.pdf,.docx,.txt" onChange={(e) => setUploadFile(e.target.files[0])} style={{ display: 'none' }} id="admin-csv-upload" />
                   <label htmlFor="admin-csv-upload" style={{ cursor: 'pointer', color: '#6366f1', fontWeight: 600, fontSize: 14, textDecoration: 'underline' }}>
-                    {uploadFile ? uploadFile.name : 'Click to select CSV file'}
+                    {uploadFile ? uploadFile.name : 'Click to select file (CSV, PDF, DOCX, TXT)'}
                   </label>
-                  <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>Format: question, optionA, optionB, optionC, optionD, answer, marks</p>
+                  <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>CSV: question,optionA,optionB,optionC,optionD,answer,marks &middot; PDF/DOCX/TXT: numbered questions with A-D options and Answer line</p>
                 </div>
                 <button type="submit" disabled={uploading} style={{ ...btnSuccess, width: '100%', justifyContent: 'center', opacity: uploading ? 0.6 : 1 }}>
                   {uploading ? 'Uploading...' : 'Upload Questions'}
@@ -1510,12 +1577,120 @@ export default function AdminPanel() {
     );
   };
 
+  // ─── Tab Content: Exams ─────────────────────────────────────────────────
+  const renderExams = () => {
+    const btnGrad = { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, border: 'none', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease' };
+    const statusColor = (s) => s === 'PUBLISHED' ? { bg: '#dcfce7', text: '#166534' } : s === 'ARCHIVED' ? { bg: '#f3f4f6', text: '#374151' } : { bg: '#fef9c3', text: '#854d0e' };
+
+    return (
+      <div style={{ animation: 'fadeIn 0.35s ease both' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
+          <div>
+            <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Manage Exams</h2>
+            <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0 0' }}>Create exams and manage their lifecycle</p>
+          </div>
+          <button onClick={() => setShowExamModal(true)} style={{ ...btnGrad, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}><Plus size={16} /> Create Exam</button>
+        </div>
+
+        {loading ? renderLoader() : allExams.length === 0 ? (
+          <div style={cardBase}><div style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}><BookOpen size={40} style={{ marginBottom: 12, opacity: 0.5 }} /><p style={{ fontSize: 15, fontWeight: 500 }}>No exams yet</p><p style={{ fontSize: 13, marginTop: 6 }}>Create your first exam using the button above.</p></div></div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 16 }}>
+            {allExams.map((ex, idx) => {
+              const sc = statusColor(ex.status);
+              return (
+                <div key={ex.id} style={{ ...cardBase, padding: 20, animation: 'fadeInUp 0.4s ease ' + (idx * 0.06) + 's both' }} onMouseEnter={(e) => { e.currentTarget.style.boxShadow = hoverLift.boxShadow; e.currentTarget.style.transform = hoverLift.transform; }} onMouseLeave={(e) => { e.currentTarget.style.boxShadow = cardBase.boxShadow; e.currentTarget.style.transform = 'translateY(0)'; }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: 0 }}>{ex.title}</h3>
+                    <span style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: sc.bg, color: sc.text }}>{ex.status}</span>
+                  </div>
+                  {ex.description && <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 12px 0' }}>{ex.description}</p>}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14, fontSize: 12 }}>
+                    <span style={{ padding: '3px 10px', borderRadius: 6, background: '#eef2ff', color: '#4338ca', fontWeight: 600 }}>{ex.subject || 'N/A'}</span>
+                    <span style={{ padding: '3px 10px', borderRadius: 6, background: '#ecfdf5', color: '#065f46', fontWeight: 600 }}>{ex.className || 'N/A'}</span>
+                    <span style={{ padding: '3px 10px', borderRadius: 6, background: '#fef3c7', color: '#92400e', fontWeight: 600 }}>{ex.type || 'TEST'}</span>
+                    <span style={{ padding: '3px 10px', borderRadius: 6, background: '#f1f5f9', color: '#475569', fontWeight: 600 }}>{ex.duration}min</span>
+                    <span style={{ padding: '3px 10px', borderRadius: 6, background: '#f1f5f9', color: '#475569', fontWeight: 600 }}>{ex.totalMarks} marks</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>By {ex.teacherName} &middot; {ex.questionCount} Qs &middot; {ex.resultCount} results</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {ex.status === 'DRAFT' && (
+                      <button onClick={() => handlePublishExam(ex.id)} style={{ ...btnGrad, background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 4px 14px rgba(34,197,94,0.35)', fontSize: 12, padding: '7px 14px' }}>Publish</button>
+                    )}
+                    {ex.status === 'PUBLISHED' && (
+                      <button onClick={() => handleArchiveExam(ex.id)} style={{ ...btnGrad, background: '#f3f4f6', color: '#374151', boxShadow: 'none', fontSize: 12, padding: '7px 14px' }}>Archive</button>
+                    )}
+                    {ex.status === 'DRAFT' && (
+                      <button onClick={() => handleDeleteExam(ex.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#fee2e2', color: '#991b1b', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}><Trash2 size={14} /> Delete</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Create Exam Modal */
+        {showExamModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+            <div style={{ ...cardBase, padding: 28, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
+              <button onClick={() => setShowExamModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Create New Exam</h2>
+              <form onSubmit={handleCreateExam} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Teacher Assignment</label>
+                  <select required value={examForm.assignmentId} onChange={(e) => setExamForm({ ...examForm, assignmentId: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}>
+                    <option value="">-- Select assignment --</option>
+                    {assignments.map((a) => <option key={a.id} value={a.id}>{a.teacherName} - {a.subject} ({a.className})</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Exam Title *</label>
+                  <input required value={examForm.title} onChange={(e) => setExamForm({ ...examForm, title: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} placeholder="e.g. Mathematics Mid-Term Examination" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Description</label>
+                  <textarea value={examForm.description} onChange={(e) => setExamForm({ ...examForm, description: e.target.value })} rows={2} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc', resize: 'vertical' }} placeholder="Optional description" />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Type</label>
+                    <select value={examForm.type} onChange={(e) => setExamForm({ ...examForm, type: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}>
+                      <option value="TEST">Test</option>
+                      <option value="EXAM">Examination</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Duration (minutes) *</label>
+                    <input type="number" required min="1" value={examForm.duration} onChange={(e) => setExamForm({ ...examForm, duration: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Total Marks</label>
+                    <input type="number" min="1" value={examForm.totalMarks} onChange={(e) => setExamForm({ ...examForm, totalMarks: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Pass Mark</label>
+                    <input type="number" min="0" value={examForm.passMark} onChange={(e) => setExamForm({ ...examForm, passMark: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
+                  </div>
+                </div>
+                <button type="submit" style={{ width: '100%', padding: '13px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)', transition: 'all 0.2s ease' }}>Create Exam</button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ─── Tab Content Renderer ───────────────────────────────────────────────────
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard':   return renderDashboard();
       case 'teachers':    return renderTeachers();
       case 'students':    return renderStudents();
+      case 'exams':       return renderExams();
       case 'questions':   return renderQuestions();
       case 'assignments': return renderAssignments();
       case 'analytics':   return renderAnalytics();

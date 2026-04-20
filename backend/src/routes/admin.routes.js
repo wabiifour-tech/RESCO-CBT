@@ -4,20 +4,22 @@ const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/roleMiddleware');
 const bcrypt = require('bcryptjs');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 
 const router = express.Router();
 
 // ============================================================
-// Multer for CSV uploads
+// Multer for file uploads (CSV, PDF, DOCX, TXT)
 // ============================================================
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   fileFilter: (req, file, cb) => {
-    const allowedExtensions = ['.csv'];
+    const allowedExtensions = ['.csv', '.pdf', '.docx', '.doc', '.txt'];
     const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
     if (allowedExtensions.includes(ext)) cb(null, true);
-    else cb(new Error('Only CSV files are allowed.'));
+    else cb(new Error('Only CSV, PDF, DOCX, and TXT files are allowed.'));
   },
 });
 
@@ -1260,7 +1262,124 @@ router.get('/exams', async (req, res) => {
 });
 
 // ============================================================
-// 15. GET /questions/exams — List DRAFT exams for question management
+// 15. POST /exams/create — Create Exam
+// ============================================================
+router.post('/exams/create', async (req, res) => {
+  try {
+    const { assignmentId, title, description, type, duration, totalMarks, passMark, startDate, endDate } = req.body;
+
+    if (!assignmentId || !title || !duration) {
+      return res.status(400).json({ error: 'Missing required fields: assignmentId, title, duration' });
+    }
+
+    const assignment = await prisma.teacherAssignment.findUnique({
+      where: { id: assignmentId },
+      include: { teacher: { select: { id: true, status: true } } },
+    });
+    if (!assignment) return res.status(404).json({ error: 'Assignment not found.' });
+    if (assignment.teacher.status !== 'ACTIVE') return res.status(400).json({ error: 'Teacher must be ACTIVE to create exams.' });
+
+    const dur = parseInt(duration, 10);
+    if (isNaN(dur) || dur < 1) return res.status(400).json({ error: 'Duration must be a positive integer (minutes).' });
+
+    const exam = await prisma.exam.create({
+      data: {
+        assignmentId,
+        title: title.trim(),
+        description: (description || '').trim() || null,
+        type: type || 'TEST',
+        status: 'DRAFT',
+        duration: dur,
+        totalMarks: parseInt(totalMarks, 10) || 100,
+        passMark: parseInt(passMark, 10) || 50,
+        startDate: startDate || '',
+        endDate: endDate || '',
+      },
+      include: {
+        assignment: { include: { teacher: { select: { firstName: true, lastName: true } } } },
+      },
+    });
+
+    res.status(201).json({
+      id: exam.id,
+      title: exam.title,
+      status: exam.status,
+      type: exam.type,
+      duration: exam.duration,
+      totalMarks: exam.totalMarks,
+      passMark: exam.passMark,
+      message: 'Exam created successfully. Add questions to it before publishing.',
+    });
+  } catch (error) {
+    console.error('[Admin Create Exam Error]', error);
+    res.status(500).json({ error: 'Failed to create exam.' });
+  }
+});
+
+// ============================================================
+// 15b. PATCH /exams/:id/publish — Publish Exam
+// ============================================================
+router.patch('/exams/:id/publish', async (req, res) => {
+  try {
+    const exam = await prisma.exam.findUnique({
+      where: { id: req.params.id },
+      include: { _count: { select: { questions: true } } },
+    });
+    if (!exam) return res.status(404).json({ error: 'Exam not found.' });
+    if (exam.status === 'PUBLISHED') return res.status(400).json({ error: 'Exam is already published.' });
+    if (exam.status === 'ARCHIVED') return res.status(400).json({ error: 'Cannot re-publish an archived exam. Create a new one.' });
+    if (exam._count.questions === 0) return res.status(400).json({ error: 'Cannot publish exam with 0 questions. Add questions first.' });
+
+    const updated = await prisma.exam.update({ where: { id: req.params.id }, data: { status: 'PUBLISHED' } });
+    res.json({ id: updated.id, status: updated.status, message: 'Exam published successfully.' });
+  } catch (error) {
+    console.error('[Admin Publish Exam Error]', error);
+    res.status(500).json({ error: 'Failed to publish exam.' });
+  }
+});
+
+// ============================================================
+// 15c. PATCH /exams/:id/archive — Archive Exam
+// ============================================================
+router.patch('/exams/:id/archive', async (req, res) => {
+  try {
+    const exam = await prisma.exam.findUnique({ where: { id: req.params.id } });
+    if (!exam) return res.status(404).json({ error: 'Exam not found.' });
+    if (exam.status === 'ARCHIVED') return res.status(400).json({ error: 'Exam is already archived.' });
+    if (exam.status === 'DRAFT') return res.status(400).json({ error: 'Cannot archive a draft exam. Delete it instead.' });
+
+    const updated = await prisma.exam.update({ where: { id: req.params.id }, data: { status: 'ARCHIVED' } });
+    res.json({ id: updated.id, status: updated.status, message: 'Exam archived successfully.' });
+  } catch (error) {
+    console.error('[Admin Archive Exam Error]', error);
+    res.status(500).json({ error: 'Failed to archive exam.' });
+  }
+});
+
+// ============================================================
+// 15d. DELETE /exams/:id — Delete a DRAFT Exam
+// ============================================================
+router.delete('/exams/:id', async (req, res) => {
+  try {
+    const exam = await prisma.exam.findUnique({
+      where: { id: req.params.id },
+      include: { _count: { select: { results: true } } },
+    });
+    if (!exam) return res.status(404).json({ error: 'Exam not found.' });
+    if (exam.status === 'PUBLISHED') return res.status(400).json({ error: 'Cannot delete a published exam. Archive it first.' });
+
+    // Delete questions first, then exam
+    await prisma.examQuestion.deleteMany({ where: { examId: req.params.id } });
+    await prisma.exam.delete({ where: { id: req.params.id } });
+    res.json({ message: 'Exam deleted successfully.' });
+  } catch (error) {
+    console.error('[Admin Delete Exam Error]', error);
+    res.status(500).json({ error: 'Failed to delete exam.' });
+  }
+});
+
+// ============================================================
+// 16. GET /questions/exams — List DRAFT exams for question management
 // ============================================================
 router.get('/questions/exams', async (req, res) => {
   try {
@@ -1312,7 +1431,124 @@ router.get('/questions/:examId', async (req, res) => {
 });
 
 // ============================================================
-// 17. POST /questions/upload — CSV upload (admin, any DRAFT exam)
+// PDF/DOCX/TXT Parsers
+// ============================================================
+async function parsePDF(buffer) {
+  try {
+    const data = await pdfParse(buffer);
+    return parseTextQuestions(data.text);
+  } catch (err) {
+    return { error: 'Failed to parse PDF: ' + err.message };
+  }
+}
+
+async function parseDOCX(buffer) {
+  try {
+    const result = await mammoth.extractRawText({ buffer });
+    return parseTextQuestions(result.value);
+  } catch (err) {
+    return { error: 'Failed to parse DOCX: ' + err.message };
+  }
+}
+
+function parseTXT(buffer) {
+  return parseTextQuestions(buffer.toString('utf-8'));
+}
+
+// ============================================================
+// Unified text question parser (PDF, DOCX, TXT)
+// Supports these formats:
+//   1) Numbered questions with A/B/C/D options and answer key
+//   2) Each line: question | optionA | optionB | optionC | optionD | answer | marks
+// ============================================================
+function parseTextQuestions(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+  if (lines.length === 0) return { error: 'No content found in the file.' };
+
+  const questions = [];
+  let current = null;
+
+  // Detect format: if first line has pipes or tabs, treat as delimited
+  const firstLine = lines[0];
+  const isDelimited = (firstLine.includes('|') && (firstLine.match(/\|/g) || []).length >= 5) ||
+                       (firstLine.includes('\t') && (firstLine.match(/\t/g) || []).length >= 5);
+
+  if (isDelimited) {
+    // Delimited format: question | optionA | optionB | optionC | optionD | answer | marks
+    // Skip header if it looks like one
+    let startIdx = 0;
+    const headerCheck = firstLine.toLowerCase();
+    if (headerCheck.includes('question') && (headerCheck.includes('option') || headerCheck.includes('answer'))) {
+      startIdx = 1;
+    }
+    for (let i = startIdx; i < lines.length; i++) {
+      const sep = lines[i].includes('|') ? '|' : '\t';
+      const parts = lines[i].split(sep).map(p => p.trim());
+      if (parts.length >= 6) {
+        questions.push({
+          question: parts[0], optionA: parts[1], optionB: parts[2],
+          optionC: parts[3], optionD: parts[4], answer: parts[5].toUpperCase(),
+          marks: parseInt(parts[6]) || 1, _rawIndex: i + 1,
+        });
+      }
+    }
+    return questions.length > 0 ? { rows: questions } : { error: 'Could not parse any questions from delimited file. Expected: question | optionA | optionB | optionC | optionD | answer | marks' };
+  }
+
+  // Numbered question format
+  // Supported patterns:
+  //   1. What is 2+2?
+  //   A. 2
+  //   B. 3
+  //   C. 4
+  //   D. 5
+  //   Answer: C
+  //   Marks: 2
+  //
+  // Or inline: 1. What is 2+2? A.2 B.3 C.4 D.5 Ans:C Marks:2
+  const qPattern = /^(\d+)[.\)]\s*(.+)/;
+  const optPattern = /^\s*([A-Da-d])[.\):]\s*(.+)/;
+  const ansPattern = /^\s*(?:answer|ans|correct)[.\s:]+\s*([A-Da-d])/i;
+  const marksPattern = /^\s*(?:mark|score|point)[s]?[.\s:]+\s*(\d+)/i;
+
+  for (const line of lines) {
+    const qMatch = line.match(qPattern);
+    if (qMatch) {
+      if (current && current.question) questions.push(current);
+      current = { question: qMatch[2].trim(), optionA: '', optionB: '', optionC: '', optionD: '', answer: '', marks: 1, _rawIndex: parseInt(qMatch[1]) };
+      // Check if options are on same line: 1. Question? A.opt1 B.opt2 C.opt3 D.opt4 Ans:C
+      const inlineOpts = line.substring(qMatch[0].length).match(/([A-Da-d])[.\):]\s*([^A-D]*?)(?=\s+[A-D][.\):]|\s+Ans|$)/gi);
+      if (inlineOpts && inlineOpts.length >= 4) {
+        const keys = ['optionA', 'optionB', 'optionC', 'optionD'];
+        inlineOpts.forEach((opt, idx) => {
+          if (idx < 4) {
+            const m = opt.match(/([A-Da-d])[.\):]\s*(.*)/);
+            if (m) current[keys[idx]] = m[2].trim();
+          }
+        });
+      }
+      continue;
+    }
+    if (!current) continue;
+
+    const optMatch = line.match(optPattern);
+    if (optMatch) {
+      const key = 'option' + optMatch[1].toUpperCase();
+      if (current.hasOwnProperty(key)) current[key] = optMatch[2].trim();
+      continue;
+    }
+    const ansMatch = line.match(ansPattern);
+    if (ansMatch) { current.answer = ansMatch[1].toUpperCase(); continue; }
+    const marksMatch = line.match(marksPattern);
+    if (marksMatch) { current.marks = parseInt(marksMatch[1]) || 1; continue; }
+  }
+  if (current && current.question) questions.push(current);
+
+  return questions.length > 0 ? { rows: questions } : { error: 'Could not parse any questions from the file. Expected numbered questions (1. Question text) with options A-D and an Answer line.' };
+}
+
+// ============================================================
+// 19. POST /questions/upload — Multi-format upload (CSV, PDF, DOCX, TXT)
 // ============================================================
 router.post('/questions/upload', upload.single('file'), async (req, res) => {
   try {
@@ -1322,8 +1558,25 @@ router.post('/questions/upload', upload.single('file'), async (req, res) => {
     const exam = await prisma.exam.findUnique({ where: { id: examId } });
     if (!exam) return res.status(404).json({ error: 'Exam not found.' });
     if (exam.status !== 'DRAFT') return res.status(400).json({ error: 'Only DRAFT exams can be modified.' });
-    const parsed = parseCSV(req.file.buffer);
+
+    const ext = req.file.originalname.toLowerCase().slice(req.file.originalname.lastIndexOf('.'));
+    let parsed;
+
+    if (ext === '.csv') {
+      parsed = parseCSV(req.file.buffer);
+    } else if (ext === '.pdf') {
+      parsed = await parsePDF(req.file.buffer);
+    } else if (ext === '.docx' || ext === '.doc') {
+      if (ext === '.doc') return res.status(400).json({ error: 'Old .doc format is not supported. Please save as .docx or .pdf.' });
+      parsed = await parseDOCX(req.file.buffer);
+    } else if (ext === '.txt') {
+      parsed = parseTXT(req.file.buffer);
+    } else {
+      return res.status(400).json({ error: 'Unsupported file format.' });
+    }
+
     if (parsed.error) return res.status(400).json({ error: parsed.error });
+
     const errors = [];
     const validQuestions = [];
     for (const row of parsed.rows) {
