@@ -33,15 +33,14 @@ export default function TeacherDashboard() {
     try {
       const [examsRes, assignRes] = await Promise.all([
         api.get('/exams/teacher'),
-        api.get('/admin/assignments'),
+        api.get('/exams/teacher/assignments'),
       ]);
       const examList = examsRes.data.exams || [];
       setExams(examList);
       setStats({ total: examList.length, published: examList.filter(e => e.status === 'PUBLISHED').length, draft: examList.filter(e => e.status === 'DRAFT').length });
 
       // Get assignments for this teacher
-      const myAssignments = (assignRes.data || []).filter(a => a.teacherId === user?.id);
-      setAssignments(myAssignments);
+      setAssignments(assignRes.data.assignments || []);
     } catch { toast.error('Failed to load data'); }
     finally { setLoading(false); }
   }, [user?.id]);
@@ -124,7 +123,7 @@ export default function TeacherDashboard() {
           </div>
           <div className="flex items-center gap-3">
             <LiveClock compact />
-            <span className="text-sm text-gray-600">Hello, <b>{user?.firstName}</b></span>
+            <span className="text-sm text-gray-600">Hello, <b>{user?.teacher?.firstName || user?.email}</b></span>
             <button onClick={() => { logout(); window.location.href = '/'; }} className="text-gray-400 hover:text-red-500"><LogOut className="w-5 h-5" /></button>
           </div>
         </div>

@@ -54,6 +54,35 @@ router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, asy
   }
 });
 
+// Get Teacher's Assignments (for dropdown)
+router.get('/teacher/assignments', authenticate, requireRole('TEACHER'), async (req, res) => {
+  try {
+    const assignments = await prisma.teacherAssignment.findMany({
+      where: { teacherId: req.user.userId },
+      include: {
+        teacher: { select: { firstName: true, lastName: true, status: true } },
+        _count: { select: { exams: true } },
+      },
+      orderBy: [{ academicYear: 'desc' }, { className: 'asc' }, { subject: 'asc' }],
+    });
+    res.json({
+      success: true,
+      assignments: assignments.map(a => ({
+        id: a.id,
+        teacherId: a.teacherId,
+        teacherName: `${a.teacher.firstName} ${a.teacher.lastName}`,
+        subject: a.subject,
+        className: a.className,
+        academicYear: a.academicYear,
+        examCount: a._count.exams,
+      })),
+    });
+  } catch (error) {
+    console.error('Get teacher assignments error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch assignments.' });
+  }
+});
+
 // Get Teacher's Exams
 router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) => {
   try {
