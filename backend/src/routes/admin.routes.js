@@ -103,7 +103,7 @@ router.get('/teachers', async (req, res) => {
         orderBy: { id: 'desc' },
         include: {
           user: { select: { email: true, createdAt: true } },
-          _count: { select: { assignments: true, exams: true } },
+          _count: { select: { assignments: true } },
         },
       }),
       prisma.teacher.count({ where }),
@@ -120,7 +120,6 @@ router.get('/teachers', async (req, res) => {
         subjects: JSON.parse(t.subjects || '[]'),
         createdAt: t.createdAt,
         assignmentCount: t._count.assignments,
-        examCount: t._count.exams,
       })),
       pagination: {
         total,
@@ -302,7 +301,7 @@ router.delete('/teachers/:id', async (req, res) => {
     const teacher = await prisma.teacher.findUnique({
       where: { id },
       include: {
-        _count: { select: { exams: true, assignments: true, results: true } },
+        _count: { select: { assignments: true, results: true } },
       },
     });
 
