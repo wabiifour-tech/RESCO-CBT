@@ -8,4 +8,9 @@ cmds = ["npm install"]
 cmds = ["npx prisma generate"]
 
 [phases.start]
-cmds = ["node src/server.js"]
+cmds = [
+  "mkdir -p /data",
+  "npx prisma db push --skip-generate --accept-data-loss 2>/dev/null || true",
+  "node prisma/seed.js",
+  "node src/server.js"
+]

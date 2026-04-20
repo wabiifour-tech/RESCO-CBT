@@ -1,5 +1,10 @@
 require('dotenv').config();
 
+// Ensure DATABASE_URL has a default for local development
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'file:./prisma/dev.db';
+}
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
