@@ -100,7 +100,7 @@ export default function TeacherDashboard() {
   };
 
   const handleExport = (examId, format = 'csv') => {
-    const baseUrl = import.meta.env.VITE_API_URL || 'https://resco-cbt-jwtsecret.up.railway.app/api';
+    const baseUrl = import.meta.env.VITE_API_URL || 'https://resco-cbt-production.up.railway.app/api';
     window.open(baseUrl + '/results/export/' + examId + '?format=' + format, '_blank');
   };
 
