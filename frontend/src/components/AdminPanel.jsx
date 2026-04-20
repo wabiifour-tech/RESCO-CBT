@@ -1419,12 +1419,8 @@ export default function AdminPanel() {
             <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0 0' }}>Upload or manually add questions to DRAFT exams</p>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {selectedExamId && (
-              <>
-                <button onClick={() => setShowUploadModal(true)} style={btnSuccess}><Upload size={16} /> Upload File</button>
-                <button onClick={() => setShowManualModal(true)} style={btnPrimary}><Plus size={16} /> Add Manually</button>
-              </>
-            )}
+            <button onClick={() => setShowUploadModal(true)} style={btnSuccess}><Upload size={16} /> Upload File</button>
+            <button onClick={() => setShowManualModal(true)} style={btnPrimary}><Plus size={16} /> Add Manually</button>
           </div>
         </div>
 
@@ -1509,10 +1505,27 @@ export default function AdminPanel() {
         {/* Upload CSV Modal */}
         {showUploadModal && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
-            <div style={{ ...cardBase, padding: 28, maxWidth: 460, width: '100%', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
+            <div style={{ ...cardBase, padding: 28, maxWidth: 540, width: '100%', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
               <button onClick={() => setShowUploadModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Upload Questions</h2>
               <form onSubmit={handleCSVUpload} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Select DRAFT Exam <span style={{ color: '#ef4444' }}>*</span></label>
+                  <select
+                    value={selectedExamId}
+                    onChange={(e) => { setSelectedExamId(e.target.value); if (e.target.value) fetchExamQuestions(e.target.value); }}
+                    style={inputStyle}
+                    required
+                  >
+                    <option value="">-- Choose an exam --</option>
+                    {draftExams.map((ex) => (
+                      <option key={ex.id} value={ex.id}>{ex.title} ({ex.subject} - {ex.className}) [{ex.questionCount} questions]</option>
+                    ))}
+                  </select>
+                  {draftExams.length === 0 && (
+                    <p style={{ fontSize: 11, color: '#f59e0b', marginTop: 6 }}>No DRAFT exams found. Go to the Exams tab to create one first.</p>
+                  )}
+                </div>
                 <div style={{ border: '2px dashed #d1d5db', borderRadius: 12, padding: '28px 16px', textAlign: 'center', background: '#fafbfc' }}>
                   <Upload size={32} style={{ margin: '0 auto 8px', color: '#94a3b8' }} />
                   <input type="file" accept=".csv,.pdf,.docx,.txt" onChange={(e) => setUploadFile(e.target.files[0])} style={{ display: 'none' }} id="admin-csv-upload" />
@@ -1536,6 +1549,20 @@ export default function AdminPanel() {
               <button onClick={() => setShowManualModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Add Questions Manually</h2>
               <form onSubmit={handleManualSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Select DRAFT Exam <span style={{ color: '#ef4444' }}>*</span></label>
+                  <select
+                    value={selectedExamId}
+                    onChange={(e) => { setSelectedExamId(e.target.value); if (e.target.value) fetchExamQuestions(e.target.value); }}
+                    style={inputStyle}
+                    required
+                  >
+                    <option value="">-- Choose an exam --</option>
+                    {draftExams.map((ex) => (
+                      <option key={ex.id} value={ex.id}>{ex.title} ({ex.subject} - {ex.className}) [{ex.questionCount} questions]</option>
+                    ))}
+                  </select>
+                </div>
                 {manualQuestions.map((q, idx) => (
                   <div key={idx} style={{ padding: 16, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
