@@ -684,3 +684,60 @@ a, button, input, select, textarea {
   background: rgba(139, 92, 246, 0.25);
   color: #4c1d95;
 }
+
+/* ── Print Styles ───────────────────────── */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+    -webkit-font-smoothing: auto;
+  }
+
+  /* Hide non-essential elements */
+  .print\\:hidden,
+  header,
+  .print\\:hidden *,
+  nav,
+  footer,
+  button,
+  [class*="anim-"],
+  [class*="animate-"],
+  [style*="animation"],
+  [style*="background: linear-gradient"] {
+    display: none !important;
+  }
+
+  /* Ensure result content prints cleanly */
+  .result-bounce,
+  .result-slide,
+  .result-float {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  /* Force white backgrounds */
+  * {
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border-color: #ddd !important;
+  }
+
+  /* Keep result badges and score colors */
+  .bg-green-50, .bg-red-50, .bg-amber-50,
+  .bg-blue-50, .bg-purple-50, .bg-pink-50 {
+    background: #f9f9f9 !important;
+    border: 1px solid #ddd !important;
+  }
+
+  /* Ensure score ring is visible */
+  circle {
+    stroke: #6366f1 !important;
+  }
+
+  /* Clean page breaks */
+  @page {
+    margin: 1cm;
+  }
+}

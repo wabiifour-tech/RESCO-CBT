@@ -99,7 +99,7 @@ export default function AdminPanel() {
   const [examQuestions, setExamQuestions] = useState([]);
   const [selectedExamInfo, setSelectedExamInfo] = useState(null);
   const [showExamModal, setShowExamModal] = useState(false);
-  const [examForm, setExamForm] = useState({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '' });
+  const [examForm, setExamForm] = useState({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE' });
 
   // Search
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -333,7 +333,7 @@ export default function AdminPanel() {
       const res = await api.post('/admin/exams/create', examForm);
       toast.success(res.data.message);
       setShowExamModal(false);
-      setExamForm({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '' });
+      setExamForm({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE' });
       fetchAllExams();
       fetchDraftExams();
     } catch (err) {
@@ -1726,13 +1726,30 @@ export default function AdminPanel() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Total Marks</label>
-                    <input type="number" min="1" value={examForm.totalMarks} onChange={(e) => setExamForm({ ...examForm, totalMarks: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Total Marks *</label>
+                    <input type="number" min="1" value={examForm.totalMarks} onChange={(e) => setExamForm({ ...examForm, totalMarks: parseInt(e.target.value) || 1 })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Pass Mark</label>
-                    <input type="number" min="0" value={examForm.passMark} onChange={(e) => setExamForm({ ...examForm, passMark: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Pass Mark *</label>
+                    <input type="number" min="0" value={examForm.passMark} onChange={(e) => setExamForm({ ...examForm, passMark: parseInt(e.target.value) || 0 })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
                   </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Start Date *</label>
+                    <input type="datetime-local" required value={examForm.startDate} onChange={(e) => setExamForm({ ...examForm, startDate: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>End Date *</label>
+                    <input type="datetime-local" required value={examForm.endDate} onChange={(e) => setExamForm({ ...examForm, endDate: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Result Visibility</label>
+                  <select value={examForm.resultVisibility} onChange={(e) => setExamForm({ ...examForm, resultVisibility: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}>
+                    <option value="IMMEDIATE">Show results immediately after submission</option>
+                    <option value="AFTER_CLOSE">Show results only after exam closes</option>
+                  </select>
                 </div>
                 <button type="submit" style={{ width: '100%', padding: '13px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)', transition: 'all 0.2s ease' }}>Create Exam</button>
               </form>

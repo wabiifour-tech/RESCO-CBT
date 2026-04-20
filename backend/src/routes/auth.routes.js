@@ -11,7 +11,7 @@ const router = express.Router();
 // ──────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
-    const { email, username, fullName, password } = req.body;
+    const { email, username, fullName, admissionNo, password } = req.body;
 
     if (!password) {
       return res.status(400).json({
@@ -41,6 +41,18 @@ router.post('/login', async (req, res) => {
           teacher,
         };
       }
+    } else if (admissionNo) {
+      // Student login via admission number
+      const admNo = admissionNo.trim();
+      user = await prisma.user.findFirst({
+        where: {
+          role: 'STUDENT',
+          student: {
+            admissionNo: { equals: admNo, mode: 'insensitive' },
+          },
+        },
+        include: { student: true, teacher: true },
+      });
     } else if (fullName) {
       // Student login via full name
       const name = fullName.trim().toLowerCase();

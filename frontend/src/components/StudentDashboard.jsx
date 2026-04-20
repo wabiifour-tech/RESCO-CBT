@@ -8,7 +8,8 @@ import DailyDevotional from './DailyDevotional';
 import {
   LogOut, BookOpen, Clock, Award, Star, Lightbulb,
   ChevronRight, ChevronLeft, CheckCircle, XCircle,
-  Trophy, Target, Sparkles, Brain, Timer, RotateCcw, AlertTriangle, BookMarked, Monitor, ShieldCheck, Users
+  Trophy, Target, Sparkles, Brain, Timer, RotateCcw, AlertTriangle, BookMarked, Monitor, ShieldCheck, Users,
+  Printer, KeyRound
 } from 'lucide-react';
 
 const EXAM_TIPS = [
@@ -151,6 +152,8 @@ export default function StudentDashboard() {
   const [examResult, setExamResult] = useState(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [keyMaps, setKeyMaps] = useState({});
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
@@ -339,6 +342,31 @@ export default function StudentDashboard() {
     navigate('/');
   };
 
+  const handlePrintResult = function () {
+    window.print();
+  };
+
+  const handleChangePassword = async function (e) {
+    e.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    try {
+      const res = await api.post('/auth/change-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      if (res.data.success) {
+        toast.success('Password changed successfully!');
+        setShowPasswordModal(false);
+        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to change password');
+    }
+  };
+
   // Quick stats
   const totalAvailable = exams.filter(function (e) { return e.isOpen && !e.hasTaken; }).length;
   const totalTaken = results.length;
@@ -502,15 +530,24 @@ export default function StudentDashboard() {
                 </div>
               )}
 
-              {/* Back Button */}
+              {/* Back & Print Buttons */}
               <div className="px-8 pb-8 result-slide" style={{ animationDelay: '1.3s' }}>
-                <button
-                  onClick={exitToDashboard}
-                  className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-4 rounded-2xl text-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg flex items-center justify-center gap-3"
-                >
-                  <Sparkles className="w-5 h-5" />
-                  Back to Dashboard
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={exitToDashboard}
+                    className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-4 rounded-2xl text-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg flex items-center justify-center gap-3"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                    Back to Dashboard
+                  </button>
+                  <button
+                    onClick={handlePrintResult}
+                    className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold py-4 px-6 rounded-2xl text-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg flex items-center justify-center gap-3 print:hidden"
+                    title="Print Result"
+                  >
+                    <Printer className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -904,8 +941,15 @@ export default function StudentDashboard() {
               <span className="text-sm font-semibold text-gray-700">{studentName}</span>
             </div>
             <button
+              onClick={() => setShowPasswordModal(true)}
+              className="text-gray-400 hover:text-violet-500 hover:bg-violet-50 p-2 rounded-xl transition-all duration-200 print:hidden"
+              title="Change Password"
+            >
+              <KeyRound className="w-5 h-5" />
+            </button>
+            <button
               onClick={handleLogout}
-              className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-xl transition-all duration-200"
+              className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-xl transition-all duration-200 print:hidden"
               title="Logout"
             >
               <LogOut className="w-5 h-5" />
@@ -1212,7 +1256,7 @@ export default function StudentDashboard() {
         )}
 
         {/* Motivational Footer */}
-        <div className="anim-fade-in text-center pb-8" style={{ animationDelay: '0.5s' }}>
+        <div className="anim-fade-in text-center pb-8 print:hidden" style={{ animationDelay: '0.5s' }}>
           <div className="inline-flex items-center gap-2 bg-white rounded-full px-6 py-3 shadow-sm border border-gray-100">
             <Star className="w-5 h-5 text-yellow-400" />
             <span className="text-sm text-gray-500 font-medium">Keep learning, keep growing! Every exam makes you stronger. 🌟</span>
@@ -1220,6 +1264,36 @@ export default function StudentDashboard() {
           </div>
         </div>
       </main>
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+            <div className="bg-gradient-to-r from-violet-500 to-indigo-600 p-6 text-center">
+              <KeyRound className="w-10 h-10 text-white mx-auto mb-2" />
+              <h3 className="text-xl font-bold text-white">Change Password</h3>
+            </div>
+            <form onSubmit={handleChangePassword} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                <input type="password" required value={passwordForm.currentPassword} onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} className="input-field" placeholder="Enter current password" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <input type="password" required minLength={6} value={passwordForm.newPassword} onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} className="input-field" placeholder="Enter new password (min 6 chars)" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                <input type="password" required minLength={6} value={passwordForm.confirmPassword} onChange={e => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} className="input-field" placeholder="Confirm new password" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => { setShowPasswordModal(false); setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' }); }} className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-lg transition-all">Update Password</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

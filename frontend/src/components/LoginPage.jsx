@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import useAuthStore from '../store/authStore';
 import toast from 'react-hot-toast';
-import { LogOut, GraduationCap, BookOpen, Shield, Sparkles, BookOpenCheck, User, Lock, ChevronLeft, ChevronRight, MapPin, Phone, Mail, Globe, Award } from 'lucide-react';
+import { LogOut, GraduationCap, BookOpen, Shield, Sparkles, BookOpenCheck, User, Lock, ChevronLeft, ChevronRight, MapPin, Phone, Mail, Globe, Award, Hash } from 'lucide-react';
 import LiveClock from './LiveClock';
 import DailyDevotional from './DailyDevotional';
 
@@ -156,6 +156,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [shaking, setShaking] = useState(false);
   const [factIndex, setFactIndex] = useState(0);
+  const [studentLoginMode, setStudentLoginMode] = useState('name'); // 'name' or 'admissionNo'
 
   const navigate = useNavigate();
   const setUser = useAuthStore((s) => s.setUser);
@@ -187,7 +188,11 @@ export default function LoginPage() {
       } else if (role === 'TEACHER') {
         payload = { username: loginField, password };
       } else {
-        payload = { fullName: loginField, password };
+        if (studentLoginMode === 'admissionNo') {
+          payload = { admissionNo: loginField, password };
+        } else {
+          payload = { fullName: loginField, password };
+        }
       }
 
       const { data } = await api.post('/auth/login', payload);
@@ -227,19 +232,19 @@ export default function LoginPage() {
   const activeRole = roles.find((r) => r.key === role);
 
   const getPlaceholder = () => {
-    if (role === 'STUDENT') return 'Enter your full name';
+    if (role === 'STUDENT') return studentLoginMode === 'admissionNo' ? 'Enter your admission number' : 'Enter your full name';
     if (role === 'TEACHER') return 'Enter your username';
     return 'Enter admin email';
   };
 
   const getFieldLabel = () => {
-    if (role === 'STUDENT') return 'Full Name';
+    if (role === 'STUDENT') return studentLoginMode === 'admissionNo' ? 'Admission Number' : 'Full Name';
     if (role === 'TEACHER') return 'Username';
     return 'Email Address';
   };
 
   const getFieldIcon = () => {
-    if (role === 'STUDENT') return BookOpenCheck;
+    if (role === 'STUDENT') return studentLoginMode === 'admissionNo' ? Hash : BookOpenCheck;
     if (role === 'TEACHER') return User;
     return Shield;
   };
@@ -314,6 +319,21 @@ export default function LoginPage() {
                 {(() => { const Icon = activeRole.icon; return <><Icon className="w-4 h-4" style={{ color: role === 'STUDENT' ? '#8b5cf6' : role === 'TEACHER' ? '#3b82f6' : '#10b981' }} /><span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{role === 'STUDENT' ? 'Student Login' : role === 'TEACHER' ? 'Teacher Login' : 'Admin Login'}</span></>; })()}
               </div>
             </div>
+
+            {/* Student login mode toggle */}
+            {role === 'STUDENT' && (
+              <div className="flex items-center justify-center gap-1 mb-4">
+                <button type="button" onClick={() => { setStudentLoginMode('name'); setLoginField(''); setError(''); }}
+                  className={'px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ' + (studentLoginMode === 'name' ? 'bg-violet-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')}>
+                  By Name
+                </button>
+                <span className="text-gray-300 text-xs">|</span>
+                <button type="button" onClick={() => { setStudentLoginMode('admissionNo'); setLoginField(''); setError(''); }}
+                  className={'px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ' + (studentLoginMode === 'admissionNo' ? 'bg-violet-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100')}>
+                  By Admission No.
+                </button>
+              </div>
+            )}
 
             {/* Error Message */}
             {error && (
