@@ -285,7 +285,7 @@ export default function AdminPanel() {
     return (
       (s.firstName + ' ' + s.lastName).toLowerCase().includes(q) ||
       (s.admissionNo || '').toLowerCase().includes(q) ||
-      s.email.toLowerCase().includes(q)
+      (s.email || '').toLowerCase().includes(q)
     );
   });
 

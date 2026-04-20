@@ -15,12 +15,60 @@ async function seed() {
       update: {},
       create: { email: adminEmail, password: adminPw, role: 'ADMIN' },
     });
-    console.log('Admin account created.');
+    console.log('Admin account created: ' + adminEmail);
   } else {
     console.log('ADMIN_EMAIL and ADMIN_PASSWORD not set. Skipping admin creation.');
   }
 
-  console.log('Database ready. No default students, teachers, exams, or questions created.');
+  // ── Create a sample teacher for testing ──
+  const teacherUsername = 'teacher1';
+  const teacherEmail = 'teacher1@resco.local';
+  const teacherPw = await bcrypt.hash('teacher123', 10);
+
+  const teacherUser = await prisma.user.upsert({
+    where: { email: teacherEmail },
+    update: {},
+    create: { email: teacherEmail, password: teacherPw, role: 'TEACHER' },
+  });
+
+  await prisma.teacher.upsert({
+    where: { username: teacherUsername },
+    update: {},
+    create: {
+      id: teacherUser.id,
+      firstName: 'Samuel',
+      lastName: 'Adebayo',
+      username: teacherUsername,
+      status: 'ACTIVE',
+      subjects: '["Mathematics","General Mathematics"]',
+    },
+  });
+  console.log('Sample teacher created: username=' + teacherUsername + ', password=teacher123');
+
+  // ── Create a sample student for testing ──
+  const studentEmail = 'student1@resco.edu.ng';
+  const studentPw = await bcrypt.hash('student123', 10);
+
+  const studentUser = await prisma.user.upsert({
+    where: { email: studentEmail },
+    update: {},
+    create: { email: studentEmail, password: studentPw, role: 'STUDENT' },
+  });
+
+  await prisma.student.upsert({
+    where: { admissionNo: 'RES/2025/001' },
+    update: {},
+    create: {
+      id: studentUser.id,
+      admissionNo: 'RES/2025/001',
+      firstName: 'John',
+      lastName: 'Okafor',
+      className: 'JSS1',
+    },
+  });
+  console.log('Sample student created: full name=John Okafor, password=student123');
+
+  console.log('Database seeding complete.');
 }
 
 seed()

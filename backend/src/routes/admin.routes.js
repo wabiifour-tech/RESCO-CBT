@@ -911,25 +911,34 @@ router.delete('/assignments/:id', async (req, res) => {
 router.get('/analytics', async (req, res) => {
   try {
     // 1. Performance by class — average scores per class
-    const classPerformance = await prisma.result.groupBy({
-      by: ['studentId'],
-      _avg: { percentage: true },
+    // groupBy does NOT support include in Prisma, so we use findMany instead
+    const allResults = await prisma.result.findMany({
       include: {
-        student: {
-          select: { className: true },
-        },
+        student: { select: { className: true } },
+        exam: { include: { assignment: { select: { subject: true, className: true } } } },
       },
     });
 
     // Aggregate by class
     const classScores = {};
-    for (const cp of classPerformance) {
-      const cls = cp.student.className;
-      if (!classScores[cls]) {
-        classScores[cls] = { total: 0, count: 0 };
+    const studentAvgMap = {};
+    for (const r of allResults) {
+      const cls = r.student?.className || 'Unknown';
+      const key = r.studentId;
+      if (!studentAvgMap[key]) {
+        studentAvgMap[key] = { cls: cls, percentages: [] };
       }
-      classScores[cls].total += cp._avg.percentage || 0;
-      classScores[cls].count += 1;
+      studentAvgMap[key].percentages.push(r.percentage);
+    }
+
+    for (const key of Object.keys(studentAvgMap)) {
+      const data = studentAvgMap[key];
+      const avg = data.percentages.reduce((a, b) => a + b, 0) / data.percentages.length;
+      if (!classScores[data.cls]) {
+        classScores[data.cls] = { total: 0, count: 0 };
+      }
+      classScores[data.cls].total += avg;
+      classScores[data.cls].count += 1;
     }
 
     const performanceByClass = Object.entries(classScores).map(([className, data]) => ({
@@ -938,21 +947,10 @@ router.get('/analytics', async (req, res) => {
       studentCount: data.count,
     }));
 
-    // 2. Performance by subject — average scores per subject
-    const examResults = await prisma.result.findMany({
-      include: {
-        exam: {
-          include: {
-            assignment: {
-              select: { subject: true },
-            },
-          },
-        },
-      },
-    });
-
+    // 2. Performance by subject — reuse allResults
     const subjectScores = {};
-    for (const r of examResults) {
+    for (const r of allResults) {
+      if (!r.exam) continue; // Skip orphaned results
       const subj = r.exam.assignment?.subject || 'Unknown';
       if (!subjectScores[subj]) {
         subjectScores[subj] = { total: 0, count: 0 };
