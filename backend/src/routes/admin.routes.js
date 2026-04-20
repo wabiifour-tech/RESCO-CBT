@@ -1266,25 +1266,78 @@ router.get('/exams', async (req, res) => {
 // ============================================================
 router.post('/exams/create', async (req, res) => {
   try {
-    const { assignmentId, title, description, type, duration, totalMarks, passMark, startDate, endDate } = req.body;
+    const { assignmentId, subject, className, teacherId, title, description, type, duration, totalMarks, passMark, startDate, endDate } = req.body;
 
-    if (!assignmentId || !title || !duration) {
-      return res.status(400).json({ error: 'Missing required fields: assignmentId, title, duration' });
+    if (!title || !duration) {
+      return res.status(400).json({ error: 'Missing required fields: title, duration' });
     }
-
-    const assignment = await prisma.teacherAssignment.findUnique({
-      where: { id: assignmentId },
-      include: { teacher: { select: { id: true, status: true } } },
-    });
-    if (!assignment) return res.status(404).json({ error: 'Assignment not found.' });
-    if (assignment.teacher.status !== 'ACTIVE') return res.status(400).json({ error: 'Teacher must be ACTIVE to create exams.' });
 
     const dur = parseInt(duration, 10);
     if (isNaN(dur) || dur < 1) return res.status(400).json({ error: 'Duration must be a positive integer (minutes).' });
 
+    // Determine the assignmentId: either provided directly or auto-created
+    let finalAssignmentId = assignmentId;
+
+    if (!finalAssignmentId) {
+      // Require subject and className when no assignmentId
+      if (!subject || !className) {
+        return res.status(400).json({ error: 'Missing required fields: subject, className (or provide assignmentId)' });
+      }
+
+      const trimmedSubject = subject.trim();
+      const trimmedClassName = className.trim();
+
+      // Find or create a teacher for this assignment
+      let targetTeacherId = teacherId;
+      if (!targetTeacherId) {
+        // Find the first active teacher, or create a system placeholder
+        const anyTeacher = await prisma.teacher.findFirst({
+          where: { status: 'ACTIVE' },
+          select: { id: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (!anyTeacher) {
+          return res.status(400).json({ error: 'No active teachers found. Create a teacher first or provide teacherId.' });
+        }
+        targetTeacherId = anyTeacher.id;
+      }
+
+      // Check if assignment already exists for this teacher+subject+class
+      const existingAssignment = await prisma.teacherAssignment.findUnique({
+        where: {
+          teacherId_subject_className: {
+            teacherId: targetTeacherId,
+            subject: trimmedSubject,
+            className: trimmedClassName,
+          },
+        },
+      });
+
+      if (existingAssignment) {
+        finalAssignmentId = existingAssignment.id;
+      } else {
+        // Auto-create the assignment
+        const newAssignment = await prisma.teacherAssignment.create({
+          data: {
+            teacherId: targetTeacherId,
+            subject: trimmedSubject,
+            className: trimmedClassName,
+          },
+        });
+        finalAssignmentId = newAssignment.id;
+      }
+    }
+
+    // Verify assignment exists
+    const assignment = await prisma.teacherAssignment.findUnique({
+      where: { id: finalAssignmentId },
+      include: { teacher: { select: { id: true, status: true } } },
+    });
+    if (!assignment) return res.status(404).json({ error: 'Assignment not found.' });
+
     const exam = await prisma.exam.create({
       data: {
-        assignmentId,
+        assignmentId: finalAssignmentId,
         title: title.trim(),
         description: (description || '').trim() || null,
         type: type || 'TEST',

@@ -24,8 +24,8 @@ export default function TeacherDashboard() {
   const [examResults, setExamResults] = useState(null);
 
   // Form states
-  const [createForm, setCreateForm] = useState({ title: '', description: '', type: 'TEST', duration: 30, totalMarks: 50, passMark: 25, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE', assignmentId: '' });
-  const [questionForm, setQuestionForm] = useState([{ question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }]);
+  const [createForm, setCreateForm] = useState({ title: '', description: '', type: 'TEST', duration: 30, totalMarks: 50, passMark: 25, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE', subject: '', className: 'JSS1' });
+  const [questionForm, setQuestionForm] = useState(Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; }));
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadExamId, setUploadExamId] = useState('');
 
@@ -60,7 +60,7 @@ export default function TeacherDashboard() {
       await api.post('/exams', createForm);
       toast.success('Exam created successfully!');
       setShowCreate(false);
-      setCreateForm({ title: '', description: '', type: 'TEST', duration: 30, totalMarks: 50, passMark: 25, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE', assignmentId: '' });
+      setCreateForm({ title: '', description: '', type: 'TEST', duration: 30, totalMarks: 50, passMark: 25, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE', subject: '', className: 'JSS1' });
       fetchData();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to create exam'); }
   };
@@ -80,7 +80,7 @@ export default function TeacherDashboard() {
       toast.success(`${questionForm.filter(q => q.question).length} questions added!`);
       setShowAddQuestions(false);
       setSelectedExam(null);
-      setQuestionForm([{ question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }]);
+      setQuestionForm(Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; }));
       fetchData();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to add questions'); }
   };
@@ -282,14 +282,17 @@ export default function TeacherDashboard() {
             <button onClick={() => setShowCreate(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             <h2 className="text-xl font-bold mb-4">Create New Exam</h2>
             <form onSubmit={handleCreateExam} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Subject *</label><input type="text" value={createForm.subject} onChange={e => setCreateForm({ ...createForm, subject: e.target.value })} className="input-field" required placeholder="e.g. Mathematics" /></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Class *</label><select value={createForm.className} onChange={e => setCreateForm({ ...createForm, className: e.target.value })} className="input-field"><option value="JSS1">JSS1</option><option value="JSS2">JSS2</option><option value="JSS3">JSS3</option><option value="SSS1">SSS1</option><option value="SSS2">SSS2</option><option value="SSS3">SSS3</option></select></div>
+              </div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">Title</label><input type="text" value={createForm.title} onChange={e => setCreateForm({ ...createForm, title: e.target.value })} className="input-field" required /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea value={createForm.description} onChange={e => setCreateForm({ ...createForm, description: e.target.value })} className="input-field" rows={2} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Assignment</label><select value={createForm.assignmentId} onChange={e => setCreateForm({ ...createForm, assignmentId: e.target.value })} className="input-field" required><option value="">Select...</option>{assignments.map(a => <option key={a.id} value={a.id}>{a.subject} - {a.className}</option>)}</select></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">Type</label><select value={createForm.type} onChange={e => setCreateForm({ ...createForm, type: e.target.value })} className="input-field"><option value="TEST">Test</option><option value="EXAM">Exam</option></select></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Duration (min)</label><input type="number" value={createForm.duration} onChange={e => setCreateForm({ ...createForm, duration: parseInt(e.target.value) })} className="input-field" min="5" required /></div>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Duration (min)</label><input type="number" value={createForm.duration} onChange={e => setCreateForm({ ...createForm, duration: parseInt(e.target.value) })} className="input-field" min="5" required /></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">Total Marks</label><input type="number" value={createForm.totalMarks} onChange={e => setCreateForm({ ...createForm, totalMarks: parseInt(e.target.value) })} className="input-field" min="1" required /></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">Pass Mark</label><input type="number" value={createForm.passMark} onChange={e => setCreateForm({ ...createForm, passMark: parseInt(e.target.value) })} className="input-field" min="1" required /></div>
               </div>
@@ -304,38 +307,55 @@ export default function TeacherDashboard() {
         </div>
       )}
 
-      {/* ADD QUESTIONS MODAL */}
+      {/* ADD QUESTIONS — Table-based Inline Editor */}
       {showAddQuestions && selectedExam && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto relative">
-            <button onClick={() => setShowAddQuestions(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-[96vw] w-[96vw] p-6 max-h-[92vh] overflow-y-auto relative">
+            <button onClick={() => { setShowAddQuestions(false); setQuestionForm(Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })); }} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             <h2 className="text-xl font-bold mb-1">Add Questions</h2>
             <p className="text-sm text-gray-500 mb-4">Exam: {selectedExam.title}</p>
-            <form onSubmit={handleAddQuestions} className="space-y-4">
-              {questionForm.map((q, i) => (
-                <div key={i} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700">Question {i + 1}</span>
-                    {questionForm.length > 1 && <button type="button" onClick={() => setQuestionForm(questionForm.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>}
-                  </div>
-                  <textarea value={q.question} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], question: e.target.value }; setQuestionForm(updated); }} className="input-field" rows={2} placeholder="Enter question..." required />
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex items-center gap-2"><span className="w-6 h-6 bg-primary-100 text-primary-700 rounded text-xs font-bold flex items-center justify-center">A</span><input type="text" value={q.optionA} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], optionA: e.target.value }; setQuestionForm(updated); }} className="input-field flex-1" placeholder="Option A" required /></div>
-                    <div className="flex items-center gap-2"><span className="w-6 h-6 bg-primary-100 text-primary-700 rounded text-xs font-bold flex items-center justify-center">B</span><input type="text" value={q.optionB} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], optionB: e.target.value }; setQuestionForm(updated); }} className="input-field flex-1" placeholder="Option B" required /></div>
-                    <div className="flex items-center gap-2"><span className="w-6 h-6 bg-primary-100 text-primary-700 rounded text-xs font-bold flex items-center justify-center">C</span><input type="text" value={q.optionC} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], optionC: e.target.value }; setQuestionForm(updated); }} className="input-field flex-1" placeholder="Option C" required /></div>
-                    <div className="flex items-center gap-2"><span className="w-6 h-6 bg-primary-100 text-primary-700 rounded text-xs font-bold flex items-center justify-center">D</span><input type="text" value={q.optionD} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], optionD: e.target.value }; setQuestionForm(updated); }} className="input-field flex-1" placeholder="Option D" required /></div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2"><label className="text-sm text-gray-600">Answer:</label><select value={q.answer} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], answer: e.target.value }; setQuestionForm(updated); }} className="input-field w-20"><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
-                    <div className="flex items-center gap-2"><label className="text-sm text-gray-600">Marks:</label><input type="number" value={q.marks} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], marks: parseInt(e.target.value) || 1 }; setQuestionForm(updated); }} className="input-field w-20" min="1" /></div>
-                  </div>
-                </div>
-              ))}
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setQuestionForm([...questionForm, { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }])} className="btn-primary flex items-center gap-2"><Plus className="w-4 h-4" /> Add Question</button>
-                <button type="submit" className="btn-success flex-1">Save All Questions</button>
-              </div>
-            </form>
+            <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-2 py-2 text-center text-xs font-bold text-gray-500 w-10 border-b-2 border-gray-200">#</th>
+                    <th className="px-2 py-2 text-left text-xs font-bold text-gray-500 border-b-2 border-gray-200 min-w-[180px]">Question</th>
+                    <th className="px-2 py-2 text-left text-xs font-bold text-gray-500 border-b-2 border-gray-200 min-w-[100px]">Option A</th>
+                    <th className="px-2 py-2 text-left text-xs font-bold text-gray-500 border-b-2 border-gray-200 min-w-[100px]">Option B</th>
+                    <th className="px-2 py-2 text-left text-xs font-bold text-gray-500 border-b-2 border-gray-200 min-w-[100px]">Option C</th>
+                    <th className="px-2 py-2 text-left text-xs font-bold text-gray-500 border-b-2 border-gray-200 min-w-[100px]">Option D</th>
+                    <th className="px-2 py-2 text-center text-xs font-bold text-gray-500 border-b-2 border-gray-200 w-[80px]">Answer</th>
+                    <th className="px-2 py-2 text-center text-xs font-bold text-gray-500 border-b-2 border-gray-200 w-[60px]">Marks</th>
+                    <th className="px-2 py-2 text-center text-xs font-bold text-gray-500 border-b-2 border-gray-200 w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {questionForm.map((q, i) => (
+                    <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-2 py-1 text-center text-gray-500 font-semibold text-xs">{i + 1}</td>
+                      <td className="px-2 py-1"><input type="text" value={q.question} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], question: e.target.value }; setQuestionForm(updated); }} className="input-field text-xs !py-1.5" placeholder="Type question..." /></td>
+                      <td className="px-2 py-1"><input type="text" value={q.optionA} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], optionA: e.target.value }; setQuestionForm(updated); }} className="input-field text-xs !py-1.5" placeholder="A" /></td>
+                      <td className="px-2 py-1"><input type="text" value={q.optionB} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], optionB: e.target.value }; setQuestionForm(updated); }} className="input-field text-xs !py-1.5" placeholder="B" /></td>
+                      <td className="px-2 py-1"><input type="text" value={q.optionC} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], optionC: e.target.value }; setQuestionForm(updated); }} className="input-field text-xs !py-1.5" placeholder="C" /></td>
+                      <td className="px-2 py-1"><input type="text" value={q.optionD} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], optionD: e.target.value }; setQuestionForm(updated); }} className="input-field text-xs !py-1.5" placeholder="D" /></td>
+                      <td className="px-2 py-1 text-center">
+                        <select value={q.answer} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], answer: e.target.value }; setQuestionForm(updated); }} className="input-field text-xs !py-1 text-center w-16">
+                          <option>A</option><option>B</option><option>C</option><option>D</option>
+                        </select>
+                      </td>
+                      <td className="px-2 py-1 text-center"><input type="number" min="1" value={q.marks} onChange={e => { const updated = [...questionForm]; updated[i] = { ...updated[i], marks: parseInt(e.target.value) || 1 }; setQuestionForm(updated); }} className="input-field text-xs !py-1.5 text-center w-14" /></td>
+                      <td className="px-2 py-1 text-center">
+                        <button type="button" onClick={() => setQuestionForm(questionForm.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button type="button" onClick={() => setQuestionForm([...questionForm, { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }])} className="btn-primary flex items-center gap-2"><Plus className="w-4 h-4" /> Add Row</button>
+              <button type="button" onClick={e => { e.preventDefault(); handleAddQuestions(e); }} className="btn-success flex-1">Save All ({questionForm.filter(q => q.question).length} questions)</button>
+            </div>
           </div>
         </div>
       )}

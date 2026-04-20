@@ -99,7 +99,7 @@ export default function AdminPanel() {
   const [examQuestions, setExamQuestions] = useState([]);
   const [selectedExamInfo, setSelectedExamInfo] = useState(null);
   const [showExamModal, setShowExamModal] = useState(false);
-  const [examForm, setExamForm] = useState({ assignmentId: '', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '' });
+  const [examForm, setExamForm] = useState({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '' });
 
   // Search
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -115,9 +115,9 @@ export default function AdminPanel() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
-  const [manualQuestions, setManualQuestions] = useState([
-    { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 },
-  ]);
+  const [manualQuestions, setManualQuestions] = useState(
+    Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })
+  );
 
   // Form data
   const [teacherForm, setTeacherForm] = useState({ firstName: '', lastName: '', username: '', password: '' });
@@ -333,7 +333,7 @@ export default function AdminPanel() {
       const res = await api.post('/admin/exams/create', examForm);
       toast.success(res.data.message);
       setShowExamModal(false);
-      setExamForm({ assignmentId: '', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '' });
+      setExamForm({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '' });
       fetchAllExams();
       fetchDraftExams();
     } catch (err) {
@@ -415,7 +415,9 @@ export default function AdminPanel() {
       const res = await api.post('/admin/questions/manual', { examId: selectedExamId, questions: manualQuestions });
       toast.success(res.data.message);
       setShowManualModal(false);
-      setManualQuestions([{ question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }]);
+      setManualQuestions(
+        Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })
+      );
       fetchExamQuestions(selectedExamId);
       fetchDraftExams();
     } catch (err) {
@@ -1542,61 +1544,72 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Manual Add Modal */}
+        {/* Manual Add — Table-based Inline Editor */}
         {showManualModal && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
-            <div style={{ ...cardBase, padding: 28, maxWidth: 720, width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
-              <button onClick={() => setShowManualModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
+            <div style={{ ...cardBase, padding: 28, maxWidth: '96vw', width: '96vw', maxHeight: '92vh', overflowY: 'auto', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
+              <button onClick={() => { setShowManualModal(false); setManualQuestions(Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })); }} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Add Questions Manually</h2>
-              <form onSubmit={handleManualSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Select DRAFT Exam <span style={{ color: '#ef4444' }}>*</span></label>
-                  <select
-                    value={selectedExamId}
-                    onChange={(e) => { setSelectedExamId(e.target.value); if (e.target.value) fetchExamQuestions(e.target.value); }}
-                    style={inputStyle}
-                    required
-                  >
-                    <option value="">-- Choose an exam --</option>
-                    {draftExams.map((ex) => (
-                      <option key={ex.id} value={ex.id}>{ex.title} ({ex.subject} - {ex.className}) [{ex.questionCount} questions]</option>
-                    ))}
-                  </select>
-                </div>
-                {manualQuestions.map((q, idx) => (
-                  <div key={idx} style={{ padding: 16, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Question #{idx + 1}</span>
-                      {manualQuestions.length > 1 && (
-                        <button type="button" onClick={() => setManualQuestions(manualQuestions.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px 6px', borderRadius: 6 }}><Minus size={16} /></button>
-                      )}
-                    </div>
-                    <input placeholder="Question text" value={q.question} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], question: e.target.value }; setManualQuestions(updated); }} required style={inputStyle} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
-                      <input placeholder="Option A" value={q.optionA} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionA: e.target.value }; setManualQuestions(updated); }} required style={inputStyle} />
-                      <input placeholder="Option B" value={q.optionB} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionB: e.target.value }; setManualQuestions(updated); }} required style={inputStyle} />
-                      <input placeholder="Option C" value={q.optionC} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionC: e.target.value }; setManualQuestions(updated); }} required style={inputStyle} />
-                      <input placeholder="Option D" value={q.optionD} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionD: e.target.value }; setManualQuestions(updated); }} required style={inputStyle} />
-                    </div>
-                    <div style={{ display: 'flex', gap: 12 }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 4, display: 'block' }}>Correct Answer</label>
-                        <select value={q.answer} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], answer: e.target.value }; setManualQuestions(updated); }} style={inputStyle}>
-                          <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
-                        </select>
-                      </div>
-                      <div style={{ width: 100 }}>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 4, display: 'block' }}>Marks</label>
-                        <input type="number" min="1" value={q.marks} onChange={(e) => { const updated = [...manualQuestions]; updated[idx] = { ...updated[idx], marks: parseInt(e.target.value) || 1 }; setManualQuestions(updated); }} required style={inputStyle} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <button type="button" onClick={() => setManualQuestions([...manualQuestions, { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }])} style={{ ...btnPrimary, justifyContent: 'center', width: '100%' }}><Plus size={16} /> Add Another Question</button>
-                <button type="submit" disabled={uploading} style={{ ...btnSuccess, width: '100%', justifyContent: 'center', opacity: uploading ? 0.6 : 1 }}>
-                  {uploading ? 'Saving...' : `Save ${manualQuestions.length} Question(s)`}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Select DRAFT Exam <span style={{ color: '#ef4444' }}>*</span></label>
+                <select
+                  value={selectedExamId}
+                  onChange={(e) => { setSelectedExamId(e.target.value); if (e.target.value) fetchExamQuestions(e.target.value); }}
+                  style={inputStyle}
+                  required
+                >
+                  <option value="">-- Choose an exam --</option>
+                  {draftExams.map((ex) => (
+                    <option key={ex.id} value={ex.id}>{ex.title} ({ex.subject} - {ex.className}) [{ex.questionCount} questions]</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ overflowX: 'auto', maxHeight: '60vh', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', position: 'sticky', top: 0, zIndex: 1 }}>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', minWidth: 36 }}>#</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', minWidth: 180 }}>Question Text</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', minWidth: 100 }}>Option A</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', minWidth: 100 }}>Option B</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', minWidth: 100 }}>Option C</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', minWidth: 100 }}>Option D</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', minWidth: 80 }}>Answer</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', minWidth: 60 }}>Marks</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', minWidth: 36 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {manualQuestions.map(function (q, idx) {
+                      return (
+                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '4px 6px', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: 12 }}>{idx + 1}</td>
+                          <td style={{ padding: '4px 6px' }}><input value={q.question} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], question: e.target.value }; setManualQuestions(updated); }} placeholder="Type question..." style={{ ...inputStyle, fontSize: 12, padding: '8px 10px' }} /></td>
+                          <td style={{ padding: '4px 6px' }}><input value={q.optionA} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionA: e.target.value }; setManualQuestions(updated); }} placeholder="A" style={{ ...inputStyle, fontSize: 12, padding: '8px 10px' }} /></td>
+                          <td style={{ padding: '4px 6px' }}><input value={q.optionB} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionB: e.target.value }; setManualQuestions(updated); }} placeholder="B" style={{ ...inputStyle, fontSize: 12, padding: '8px 10px' }} /></td>
+                          <td style={{ padding: '4px 6px' }}><input value={q.optionC} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionC: e.target.value }; setManualQuestions(updated); }} placeholder="C" style={{ ...inputStyle, fontSize: 12, padding: '8px 10px' }} /></td>
+                          <td style={{ padding: '4px 6px' }}><input value={q.optionD} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionD: e.target.value }; setManualQuestions(updated); }} placeholder="D" style={{ ...inputStyle, fontSize: 12, padding: '8px 10px' }} /></td>
+                          <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                            <select value={q.answer} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], answer: e.target.value }; setManualQuestions(updated); }} style={{ ...inputStyle, fontSize: 12, padding: '6px 8px', textAlign: 'center' }}>
+                              <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
+                            </select>
+                          </td>
+                          <td style={{ padding: '4px 6px', textAlign: 'center' }}><input type="number" min="1" value={q.marks} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], marks: parseInt(e.target.value) || 1 }; setManualQuestions(updated); }} style={{ ...inputStyle, fontSize: 12, padding: '6px 8px', textAlign: 'center', width: 50 }} /></td>
+                          <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                            <button type="button" onClick={function () { setManualQuestions(manualQuestions.filter(function (_, i) { return i !== idx; })); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4, borderRadius: 4 }}><Trash2 size={14} /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <button type="button" onClick={function () { setManualQuestions([...manualQuestions, { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }]); }} style={{ ...btnPrimary, justifyContent: 'center', flex: 1 }}><Plus size={16} /> Add Row</button>
+                <button type="button" onClick={function (e) { e.preventDefault(); if (!selectedExamId) { toast.error('Select an exam first'); return; } setUploading(true); api.post('/admin/questions/manual', { examId: selectedExamId, questions: manualQuestions.filter(function (q) { return q.question.trim(); }) }).then(function (res) { toast.success(res.data.message); setShowManualModal(false); setManualQuestions(Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })); fetchExamQuestions(selectedExamId); fetchDraftExams(); }).catch(function (err) { toast.error(err.response?.data?.error || 'Failed to add questions'); }).finally(function () { setUploading(false); }); }} disabled={uploading} style={{ ...btnSuccess, justifyContent: 'center', flex: 2, opacity: uploading ? 0.6 : 1 }}>
+                  {uploading ? 'Saving...' : 'Save All (' + manualQuestions.filter(function (q) { return q.question.trim(); }).length + ' questions)'}
                 </button>
-              </form>
+              </div>
             </div>
           </div>
         )}
@@ -1673,12 +1686,22 @@ export default function AdminPanel() {
               <button onClick={() => setShowExamModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Create New Exam</h2>
               <form onSubmit={handleCreateExam} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Teacher Assignment</label>
-                  <select required value={examForm.assignmentId} onChange={(e) => setExamForm({ ...examForm, assignmentId: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}>
-                    <option value="">-- Select assignment --</option>
-                    {assignments.map((a) => <option key={a.id} value={a.id}>{a.teacherName} - {a.subject} ({a.className})</option>)}
-                  </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Subject *</label>
+                    <input required value={examForm.subject} onChange={(e) => setExamForm({ ...examForm, subject: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} placeholder="e.g. Mathematics" />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Class *</label>
+                    <select value={examForm.className} onChange={(e) => setExamForm({ ...examForm, className: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}>
+                      <option value="JSS1">JSS1</option>
+                      <option value="JSS2">JSS2</option>
+                      <option value="JSS3">JSS3</option>
+                      <option value="SSS1">SSS1</option>
+                      <option value="SSS2">SSS2</option>
+                      <option value="SSS3">SSS3</option>
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Exam Title *</label>

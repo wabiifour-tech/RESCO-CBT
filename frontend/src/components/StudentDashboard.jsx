@@ -150,6 +150,7 @@ export default function StudentDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [examResult, setExamResult] = useState(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [keyMaps, setKeyMaps] = useState({});
 
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
@@ -235,14 +236,15 @@ export default function StudentDashboard() {
       const qs = res.data.questions;
       const examStartTime = res.data.examStartTime;
 
-      // Shuffle options for each question
-      const shuffledQuestions = qs.map(function (q) {
-        const shuffled = [...q.options].sort(function () { return Math.random() - 0.5; });
-        return { ...q, options: shuffled };
+      // Store keyMap for answer remapping (server handles shuffling now)
+      const maps = {};
+      qs.forEach(function (q) {
+        if (q.keyMap) maps[q.id] = q.keyMap;
       });
 
       setExamDetail(exam);
-      setQuestions(shuffledQuestions);
+      setQuestions(qs);
+      setKeyMaps(maps);
       setAnswers({});
       setCurrentQuestion(0);
       setTimeLeft(exam.duration * 60);
@@ -267,7 +269,10 @@ export default function StudentDashboard() {
     try {
       const elapsed = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0;
       const formattedAnswers = questions.map(function (q) {
-        return { questionId: q.id, selected: answers[q.id] || null };
+        var studentSelected = answers[q.id]; // e.g., 'B' (shuffled key)
+        var km = keyMaps[q.id]; // e.g., { A: 'C', B: 'A', C: 'D', D: 'B' }
+        var originalKey = km && studentSelected ? km[studentSelected] : studentSelected;
+        return { questionId: q.id, selected: originalKey || null };
       });
       const res = await api.post('/results/submit', {
         examId: examDetail.id,

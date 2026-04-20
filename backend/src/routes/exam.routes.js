@@ -13,20 +13,56 @@ const router = express.Router();
 // Create Exam
 router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, async (req, res) => {
   try {
-    const { title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility, shuffleQuestions, shuffleOptions, assignmentId } = req.body;
+    const { title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility, shuffleQuestions, shuffleOptions, assignmentId, subject, className } = req.body;
 
-    if (!title || !type || !duration || !totalMarks || !passMark || !startDate || !endDate || !assignmentId) {
+    if (!title || !type || !duration || !totalMarks || !passMark || !startDate || !endDate) {
       return res.status(400).json({ success: false, message: 'Missing required fields.' });
     }
 
-    // Verify assignment belongs to this teacher
-    const assignment = await prisma.teacherAssignment.findFirst({
-      where: { id: assignmentId, teacherId: req.user.userId },
-      include: { teacher: true },
-    });
+    // Determine assignmentId: either provided directly or auto-created from subject+className
+    let finalAssignmentId = assignmentId;
 
-    if (!assignment) {
-      return res.status(403).json({ success: false, message: 'Assignment not found or does not belong to you.' });
+    if (!finalAssignmentId) {
+      if (!subject || !className) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: subject and className (or provide assignmentId).' });
+      }
+
+      const trimmedSubject = subject.trim();
+      const trimmedClassName = className.trim();
+
+      // Check if assignment already exists for this teacher+subject+class
+      const existingAssignment = await prisma.teacherAssignment.findUnique({
+        where: {
+          teacherId_subject_className: {
+            teacherId: req.user.userId,
+            subject: trimmedSubject,
+            className: trimmedClassName,
+          },
+        },
+      });
+
+      if (existingAssignment) {
+        finalAssignmentId = existingAssignment.id;
+      } else {
+        // Auto-create the assignment
+        const newAssignment = await prisma.teacherAssignment.create({
+          data: {
+            teacherId: req.user.userId,
+            subject: trimmedSubject,
+            className: trimmedClassName,
+          },
+        });
+        finalAssignmentId = newAssignment.id;
+      }
+    } else {
+      // Verify assignment belongs to this teacher
+      const assignment = await prisma.teacherAssignment.findFirst({
+        where: { id: assignmentId, teacherId: req.user.userId },
+      });
+
+      if (!assignment) {
+        return res.status(403).json({ success: false, message: 'Assignment not found or does not belong to you.' });
+      }
     }
 
     const exam = await prisma.exam.create({
@@ -42,7 +78,7 @@ router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, asy
         resultVisibility: resultVisibility || 'IMMEDIATE',
         shuffleQuestions: shuffleQuestions !== false,
         shuffleOptions: shuffleOptions !== false,
-        assignmentId,
+        assignmentId: finalAssignmentId,
       },
       include: { assignment: true },
     });
@@ -308,18 +344,38 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
       questions = shuffleArray(questions);
     }
 
-    // Format questions with options array (keep original answer keys)
-    const formattedQuestions = questions.map(q => ({
-      id: q.id,
-      question: q.question,
-      options: [
-        { key: 'A', text: q.optionA },
-        { key: 'B', text: q.optionB },
-        { key: 'C', text: q.optionC },
-        { key: 'D', text: q.optionD },
-      ],
-      marks: q.marks,
-    }));
+    // Format questions with options array and proper shuffle with remapping
+    const formattedQuestions = questions.map(q => {
+      const options = [
+        { originalKey: 'A', text: q.optionA },
+        { originalKey: 'B', text: q.optionB },
+        { originalKey: 'C', text: q.optionC },
+        { originalKey: 'D', text: q.optionD },
+      ];
+
+      // Shuffle options if enabled
+      let shuffled = options;
+      if (exam.shuffleOptions) {
+        shuffled = [...options].sort(function () { return Math.random() - 0.5; });
+      }
+
+      // Re-label as A, B, C, D in shuffled order
+      // Build keyMap: newKey -> originalKey (for answer checking)
+      const keyMap = {};
+      const relabeled = shuffled.map(function (opt, idx) {
+        const newKey = String.fromCharCode(65 + idx); // A, B, C, D
+        keyMap[newKey] = opt.originalKey;
+        return { key: newKey, text: opt.text };
+      });
+
+      return {
+        id: q.id,
+        question: q.question,
+        options: relabeled,
+        marks: q.marks,
+        keyMap: keyMap,
+      };
+    });
 
     res.json({
       success: true,
