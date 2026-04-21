@@ -182,21 +182,27 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
       return res.status(404).json({ success: false, message: 'Result not found.' });
     }
 
-    if (result.exam.resultVisibility === 'AFTER_CLOSE' && new Date(result.exam.endDate) > new Date()) {
-      return res.status(200).json({
-        success: true,
-        result: {
-          id: result.id,
-          score: result.score,
-          totalMarks: result.totalMarks,
-          percentage: result.percentage,
-          submittedAt: result.submittedAt,
-          examStartTime: result.examStartTime,
-          examEndTime: result.examEndTime,
-          message: 'Detailed answers will be available after the exam closes.',
-          showDetails: false,
-        },
-      });
+    if (result.exam.resultVisibility === 'AFTER_CLOSE') {
+      const endDate = result.exam.endDate;
+      const hasEnd = endDate && !isNaN(new Date(endDate).getTime());
+      // If an end date exists and it hasn't passed yet, hide details
+      if (hasEnd && new Date(endDate) > new Date()) {
+        return res.status(200).json({
+          success: true,
+          result: {
+            id: result.id,
+            score: result.score,
+            totalMarks: result.totalMarks,
+            percentage: result.percentage,
+            submittedAt: result.submittedAt,
+            examStartTime: result.examStartTime,
+            examEndTime: result.examEndTime,
+            message: 'Detailed answers will be available after the exam closes.',
+            showDetails: false,
+          },
+        });
+      }
+      // No end date set — show results immediately (exam never "closes")
     }
 
     res.json({ success: true, result, showDetails: true });
