@@ -13,56 +13,10 @@ const router = express.Router();
 // Create Exam
 router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, async (req, res) => {
   try {
-    const { title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility, shuffleQuestions, shuffleOptions, assignmentId, subject, className } = req.body;
+    const { title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility, shuffleQuestions, shuffleOptions, subject, className } = req.body;
 
-    if (!title || !type || !duration || !totalMarks || !passMark || !startDate || !endDate) {
+    if (!title || !type || !duration || !totalMarks || !passMark || !startDate || !endDate || !subject || !className) {
       return res.status(400).json({ success: false, message: 'Missing required fields.' });
-    }
-
-    // Determine assignmentId: either provided directly or auto-created from subject+className
-    let finalAssignmentId = assignmentId;
-
-    if (!finalAssignmentId) {
-      if (!subject || !className) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: subject and className (or provide assignmentId).' });
-      }
-
-      const trimmedSubject = subject.trim();
-      const trimmedClassName = className.trim();
-
-      // Check if assignment already exists for this teacher+subject+class
-      const existingAssignment = await prisma.teacherAssignment.findUnique({
-        where: {
-          teacherId_subject_className: {
-            teacherId: req.user.userId,
-            subject: trimmedSubject,
-            className: trimmedClassName,
-          },
-        },
-      });
-
-      if (existingAssignment) {
-        finalAssignmentId = existingAssignment.id;
-      } else {
-        // Auto-create the assignment
-        const newAssignment = await prisma.teacherAssignment.create({
-          data: {
-            teacherId: req.user.userId,
-            subject: trimmedSubject,
-            className: trimmedClassName,
-          },
-        });
-        finalAssignmentId = newAssignment.id;
-      }
-    } else {
-      // Verify assignment belongs to this teacher
-      const assignment = await prisma.teacherAssignment.findFirst({
-        where: { id: assignmentId, teacherId: req.user.userId },
-      });
-
-      if (!assignment) {
-        return res.status(403).json({ success: false, message: 'Assignment not found or does not belong to you.' });
-      }
     }
 
     const exam = await prisma.exam.create({
@@ -78,9 +32,13 @@ router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, asy
         resultVisibility: resultVisibility || 'IMMEDIATE',
         shuffleQuestions: shuffleQuestions === false ? 0 : 1,
         shuffleOptions: shuffleOptions === false ? 0 : 1,
-        assignmentId: finalAssignmentId,
+        className: className.trim(),
+        subject: subject.trim(),
+        teacherId: req.user.userId,
       },
-      include: { assignment: true },
+      include: {
+        teacher: { select: { firstName: true, lastName: true } },
+      },
     });
 
     res.status(201).json({ success: true, exam });
@@ -93,41 +51,12 @@ router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, asy
   }
 });
 
-// Get Teacher's Assignments (for dropdown)
-router.get('/teacher/assignments', authenticate, requireRole('TEACHER'), async (req, res) => {
-  try {
-    const assignments = await prisma.teacherAssignment.findMany({
-      where: { teacherId: req.user.userId },
-      include: {
-        teacher: { select: { firstName: true, lastName: true, status: true } },
-        _count: { select: { exams: true } },
-      },
-      orderBy: [{ academicYear: 'desc' }, { className: 'asc' }, { subject: 'asc' }],
-    });
-    res.json({
-      success: true,
-      assignments: assignments.map(a => ({
-        id: a.id,
-        teacherId: a.teacherId,
-        teacherName: `${a.teacher.firstName} ${a.teacher.lastName}`,
-        subject: a.subject,
-        className: a.className,
-        academicYear: a.academicYear,
-        examCount: a._count.exams,
-      })),
-    });
-  } catch (error) {
-    console.error('Get teacher assignments error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch assignments.' });
-  }
-});
-
 // Get Teacher's Exams
 router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) => {
   try {
     const { status } = req.query;
     const where = {
-      assignment: { teacherId: req.user.userId },
+      teacherId: req.user.userId,
     };
     if (status) {
       where.status = status;
@@ -135,8 +64,24 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
 
     const exams = await prisma.exam.findMany({
       where,
-      include: {
-        assignment: { select: { subject: true, className: true } },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        type: true,
+        status: true,
+        duration: true,
+        totalMarks: true,
+        passMark: true,
+        startDate: true,
+        endDate: true,
+        resultVisibility: true,
+        shuffleQuestions: true,
+        shuffleOptions: true,
+        className: true,
+        subject: true,
+        createdAt: true,
+        updatedAt: true,
         _count: { select: { questions: true, results: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -155,7 +100,7 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
     const { id } = req.params;
 
     const exam = await prisma.exam.findFirst({
-      where: { id, assignment: { teacherId: req.user.userId } },
+      where: { id, teacherId: req.user.userId },
     });
 
     if (!exam) {
@@ -166,7 +111,7 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Can only update exams in DRAFT status.' });
     }
 
-    const { title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility, shuffleQuestions, shuffleOptions } = req.body;
+    const { title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility, shuffleQuestions, shuffleOptions, subject, className } = req.body;
 
     const updated = await prisma.exam.update({
       where: { id },
@@ -182,6 +127,8 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
         ...(resultVisibility && { resultVisibility }),
         ...(shuffleQuestions !== undefined && { shuffleQuestions: shuffleQuestions ? 1 : 0 }),
         ...(shuffleOptions !== undefined && { shuffleOptions: shuffleOptions ? 1 : 0 }),
+        ...(subject && { subject: subject.trim() }),
+        ...(className && { className: className.trim() }),
       },
     });
 
@@ -198,7 +145,7 @@ router.patch('/:id/publish', authenticate, requireRole('TEACHER'), async (req, r
     const { id } = req.params;
 
     const exam = await prisma.exam.findFirst({
-      where: { id, assignment: { teacherId: req.user.userId } },
+      where: { id, teacherId: req.user.userId },
       include: { _count: { select: { questions: true } } },
     });
 
@@ -269,10 +216,22 @@ router.get('/available', authenticate, requireRole('STUDENT'), async (req, res) 
     const exams = await prisma.exam.findMany({
       where: {
         status: 'PUBLISHED',
-        assignment: { className: student.className },
+        className: student.className,
       },
-      include: {
-        assignment: { select: { subject: true, className: true } },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        type: true,
+        duration: true,
+        totalMarks: true,
+        passMark: true,
+        startDate: true,
+        endDate: true,
+        resultVisibility: true,
+        className: true,
+        subject: true,
+        createdAt: true,
         _count: { select: { questions: true, results: true } },
         results: {
           where: { studentId: student.id },
@@ -304,7 +263,21 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
 
     const exam = await prisma.exam.findUnique({
       where: { id },
-      include: { assignment: { select: { subject: true, className: true } } },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        type: true,
+        duration: true,
+        totalMarks: true,
+        subject: true,
+        className: true,
+        status: true,
+        startDate: true,
+        endDate: true,
+        shuffleQuestions: true,
+        shuffleOptions: true,
+      },
     });
 
     if (!exam) {
@@ -363,10 +336,9 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
       }
 
       // Re-label as A, B, C, D in shuffled order
-      // Build keyMap: newKey -> originalKey (for answer checking)
       const keyMap = {};
       const relabeled = shuffled.map(function (opt, idx) {
-        const newKey = String.fromCharCode(65 + idx); // A, B, C, D
+        const newKey = String.fromCharCode(65 + idx);
         keyMap[newKey] = opt.originalKey;
         return { key: newKey, text: opt.text };
       });
@@ -389,7 +361,7 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
         type: exam.type,
         duration: exam.duration,
         totalMarks: exam.totalMarks,
-        subject: exam.assignment.subject,
+        subject: exam.subject,
       },
       questions: formattedQuestions,
       examStartTime: now.toISOString(),
@@ -408,13 +380,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const exam = await prisma.exam.findUnique({
       where: { id },
       include: {
-        assignment: {
-          select: {
-            subject: true,
-            className: true,
-            teacher: { select: { firstName: true, lastName: true } },
-          },
-        },
+        teacher: { select: { firstName: true, lastName: true } },
         _count: { select: { questions: true, results: true } },
       },
     });

@@ -9,6 +9,7 @@ cmds = ["npx prisma generate"]
 
 [phases.start]
 cmds = [
+  "node prisma/migrate-assignments.js",
   "npx prisma db push --skip-generate --accept-data-loss 2>/dev/null || true",
   "node prisma/seed.js || echo 'Seed failed, continuing with server start'",
   "node src/server.js"

@@ -158,7 +158,7 @@ router.get('/teachers', async (req, res) => {
         orderBy: { id: 'desc' },
         include: {
           user: { select: { email: true, createdAt: true } },
-          _count: { select: { assignments: true } },
+          _count: { select: { exams: true } },
         },
       }),
       prisma.teacher.count({ where }),
@@ -174,7 +174,7 @@ router.get('/teachers', async (req, res) => {
         status: t.status,
         subjects: JSON.parse(t.subjects || '[]'),
         createdAt: t.user.createdAt,
-        assignmentCount: t._count.assignments,
+        examCount: t._count.exams,
       })),
       pagination: {
         total,
@@ -356,7 +356,7 @@ router.delete('/teachers/:id', async (req, res) => {
     const teacher = await prisma.teacher.findUnique({
       where: { id },
       include: {
-        _count: { select: { assignments: true, results: true } },
+        _count: { select: { exams: true, results: true } },
       },
     });
 
@@ -780,186 +780,6 @@ router.delete('/students/:id', async (req, res) => {
 });
 
 // ============================================================
-// 10. GET /assignments — List All Teacher Assignments
-// ============================================================
-router.get('/assignments', async (req, res) => {
-  try {
-    const assignments = await prisma.teacherAssignment.findMany({
-      orderBy: [{ academicYear: 'desc' }, { className: 'asc' }, { subject: 'asc' }],
-      include: {
-        teacher: {
-          select: { firstName: true, lastName: true, status: true },
-        },
-        _count: {
-          select: { exams: true },
-        },
-      },
-    });
-
-    res.json(
-      assignments.map((a) => ({
-        id: a.id,
-        teacherId: a.teacherId,
-        teacherName: `${a.teacher.firstName} ${a.teacher.lastName}`,
-        teacherStatus: a.teacher.status,
-        subject: a.subject,
-        className: a.className,
-        academicYear: a.academicYear,
-        examCount: a._count.exams,
-      }))
-    );
-  } catch (error) {
-    console.error('[Admin List Assignments Error]', error);
-    res.status(500).json({ error: 'Failed to list assignments' });
-  }
-});
-
-// ============================================================
-// 11. POST /assignments — Create Teacher Assignment
-// ============================================================
-router.post('/assignments', async (req, res) => {
-  try {
-    const { teacherId, subject, className, academicYear } = req.body;
-
-    // Validate required fields
-    if (!teacherId || !subject || !className) {
-      return res.status(400).json({
-        error: 'Missing required fields: teacherId, subject, className',
-      });
-    }
-
-    // Check teacher exists and is ACTIVE
-    const teacher = await prisma.teacher.findUnique({
-      where: { id: teacherId },
-      select: { id: true, firstName: true, lastName: true, status: true },
-    });
-
-    if (!teacher) {
-      return res.status(404).json({ error: 'Teacher not found' });
-    }
-
-    if (teacher.status !== 'ACTIVE') {
-      return res.status(400).json({
-        error: `Cannot assign to this teacher. Teacher status is ${teacher.status}. Only ACTIVE teachers can be assigned.`,
-      });
-    }
-
-    // Check for existing assignment (unique constraint)
-    const existingAssignment = await prisma.teacherAssignment.findUnique({
-      where: {
-        teacherId_subject_className: {
-          teacherId,
-          subject: subject.trim(),
-          className: className.trim(),
-        },
-      },
-    });
-
-    if (existingAssignment) {
-      return res.status(409).json({
-        error: 'This teacher is already assigned to this subject and class combination',
-      });
-    }
-
-    // Update teacher's subjects list if the subject is new
-    const teacherFull = await prisma.teacher.findUnique({
-      where: { id: teacherId },
-      select: { subjects: true },
-    });
-
-    const trimmedSubject = subject.trim();
-    let currentSubjects = [];
-    try { currentSubjects = JSON.parse(teacherFull.subjects || '[]'); } catch(e) { currentSubjects = []; }
-    let updatedSubjects = currentSubjects;
-    if (!updatedSubjects.includes(trimmedSubject)) {
-      updatedSubjects = [...updatedSubjects, trimmedSubject];
-    }
-
-    // Create assignment in transaction (also update teacher subjects)
-    const assignment = await prisma.$transaction(async (tx) => {
-      await tx.teacher.update({
-        where: { id: teacherId },
-        data: { subjects: JSON.stringify(updatedSubjects) },
-      });
-
-      return tx.teacherAssignment.create({
-        data: {
-          teacherId,
-          subject: trimmedSubject,
-          className: className.trim(),
-          academicYear: academicYear ? academicYear.trim() : undefined,
-        },
-        include: {
-          teacher: {
-            select: { firstName: true, lastName: true },
-          },
-        },
-      });
-    });
-
-    res.status(201).json({
-      id: assignment.id,
-      teacherId: assignment.teacherId,
-      teacherName: `${assignment.teacher.firstName} ${assignment.teacher.lastName}`,
-      subject: assignment.subject,
-      className: assignment.className,
-      academicYear: assignment.academicYear,
-      message: 'Teacher assignment created successfully',
-    });
-  } catch (error) {
-    console.error('[Admin Create Assignment Error]', error);
-    res.status(500).json({ error: 'Failed to create teacher assignment' });
-  }
-});
-
-// ============================================================
-// 12. DELETE /assignments/:id — Delete Assignment
-// ============================================================
-router.delete('/assignments/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const assignment = await prisma.teacherAssignment.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: {
-            exams: true,
-          },
-        },
-      },
-    });
-
-    if (!assignment) {
-      return res.status(404).json({ error: 'Assignment not found' });
-    }
-
-    // Check if any published exams use this assignment
-    const publishedExamsCount = await prisma.exam.count({
-      where: {
-        assignmentId: id,
-        status: 'PUBLISHED',
-      },
-    });
-
-    if (publishedExamsCount > 0) {
-      return res.status(400).json({
-        error: `Cannot delete assignment. It has ${publishedExamsCount} published exam(s) linked to it.`,
-      });
-    }
-
-    await prisma.teacherAssignment.delete({
-      where: { id },
-    });
-
-    res.json({ message: 'Teacher assignment deleted successfully' });
-  } catch (error) {
-    console.error('[Admin Delete Assignment Error]', error);
-    res.status(500).json({ error: 'Failed to delete teacher assignment' });
-  }
-});
-
-// ============================================================
 // 13. GET /analytics — System Analytics
 // ============================================================
 router.get('/analytics', async (req, res) => {
@@ -969,7 +789,7 @@ router.get('/analytics', async (req, res) => {
     const allResults = await prisma.result.findMany({
       include: {
         student: { select: { className: true } },
-        exam: { include: { assignment: { select: { subject: true, className: true } } } },
+        exam: { select: { subject: true, className: true } },
       },
     });
 
@@ -1005,7 +825,7 @@ router.get('/analytics', async (req, res) => {
     const subjectScores = {};
     for (const r of allResults) {
       if (!r.exam) continue; // Skip orphaned results
-      const subj = r.exam.assignment?.subject || 'Unknown';
+      const subj = r.exam?.subject || 'Unknown';
       if (!subjectScores[subj]) {
         subjectScores[subj] = { total: 0, count: 0 };
       }
@@ -1026,11 +846,7 @@ router.get('/analytics', async (req, res) => {
         id: true,
         title: true,
         _count: { select: { results: true } },
-        assignment: {
-          select: {
-            className: true,
-          },
-        },
+        className: true,
       },
     });
 
@@ -1046,7 +862,7 @@ router.get('/analytics', async (req, res) => {
     }
 
     const examCompletionRates = exams.map((exam) => {
-      const totalStudents = classStudentMap[exam.assignment.className] || 0;
+      const totalStudents = classStudentMap[exam.className] || 0;
       const completedCount = exam._count.results;
       const completionRate = totalStudents > 0
         ? Math.round((completedCount / totalStudents) * 10000) / 100
@@ -1055,7 +871,7 @@ router.get('/analytics', async (req, res) => {
       return {
         examId: exam.id,
         title: exam.title,
-        className: exam.assignment.className,
+        className: exam.className,
         totalStudents,
         completedCount,
         completionRate,
@@ -1106,13 +922,7 @@ router.get('/analytics', async (req, res) => {
         },
       },
       include: {
-        assignment: {
-          include: {
-            teacher: {
-              select: { firstName: true, lastName: true },
-            },
-          },
-        },
+        teacher: { select: { firstName: true, lastName: true } },
         _count: {
           select: { results: true, questions: true },
         },
@@ -1128,9 +938,9 @@ router.get('/analytics', async (req, res) => {
       title: exam.title,
       type: exam.type,
       status: exam.status,
-      subject: exam.assignment.subject,
-      className: exam.assignment.className,
-      teacherName: `${exam.assignment.teacher.firstName} ${exam.assignment.teacher.lastName}`,
+      subject: exam.subject,
+      className: exam.className,
+      teacherName: `${exam.teacher.firstName} ${exam.teacher.lastName}`,
       questionCount: exam._count.questions,
       resultCount: exam._count.results,
       startDate: exam.startDate,
@@ -1188,17 +998,11 @@ router.get('/exams', async (req, res) => {
     }
 
     if (subject) {
-      where.assignment = {
-        ...where.assignment,
-        subject: { contains: subject.trim() },
-      };
+      where.subject = { contains: subject.trim() };
     }
 
     if (className) {
-      where.assignment = {
-        ...where.assignment,
-        className: className.trim(),
-      };
+      where.className = className.trim();
     }
 
     const [exams, total] = await Promise.all([
@@ -1208,12 +1012,8 @@ router.get('/exams', async (req, res) => {
         take: limitNum,
         orderBy: { createdAt: 'desc' },
         include: {
-          assignment: {
-            include: {
-              teacher: {
-                select: { firstName: true, lastName: true },
-              },
-            },
+          teacher: {
+            select: { firstName: true, lastName: true },
           },
           _count: {
             select: {
@@ -1239,10 +1039,9 @@ router.get('/exams', async (req, res) => {
         startDate: e.startDate,
         endDate: e.endDate,
         resultVisibility: e.resultVisibility,
-        teacherName: `${e.assignment.teacher.firstName} ${e.assignment.teacher.lastName}`,
-        subject: e.assignment.subject,
-        className: e.assignment.className,
-        academicYear: e.assignment.academicYear,
+        teacherName: `${e.teacher.firstName} ${e.teacher.lastName}`,
+        subject: e.subject,
+        className: e.className,
         questionCount: e._count.questions,
         resultCount: e._count.results,
         createdAt: e.createdAt,
@@ -1266,78 +1065,31 @@ router.get('/exams', async (req, res) => {
 // ============================================================
 router.post('/exams/create', async (req, res) => {
   try {
-    const { assignmentId, subject, className, teacherId, title, description, type, duration, totalMarks, passMark, startDate, endDate } = req.body;
+    const { subject, className, teacherId, title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility } = req.body;
 
-    if (!title || !duration) {
-      return res.status(400).json({ error: 'Missing required fields: title, duration' });
+    if (!title || !duration || !subject || !className) {
+      return res.status(400).json({ error: 'Missing required fields: title, duration, subject, className' });
     }
 
     const dur = parseInt(duration, 10);
     if (isNaN(dur) || dur < 1) return res.status(400).json({ error: 'Duration must be a positive integer (minutes).' });
 
-    // Determine the assignmentId: either provided directly or auto-created
-    let finalAssignmentId = assignmentId;
-
-    if (!finalAssignmentId) {
-      // Require subject and className when no assignmentId
-      if (!subject || !className) {
-        return res.status(400).json({ error: 'Missing required fields: subject, className (or provide assignmentId)' });
-      }
-
-      const trimmedSubject = subject.trim();
-      const trimmedClassName = className.trim();
-
-      // Find or create a teacher for this assignment
-      let targetTeacherId = teacherId;
-      if (!targetTeacherId) {
-        // Find the first active teacher, or create a system placeholder
-        const anyTeacher = await prisma.teacher.findFirst({
-          where: { status: 'ACTIVE' },
-          select: { id: true },
-          orderBy: { id: 'asc' },
-        });
-        if (!anyTeacher) {
-          return res.status(400).json({ error: 'No active teachers found. Create a teacher first or provide teacherId.' });
-        }
-        targetTeacherId = anyTeacher.id;
-      }
-
-      // Check if assignment already exists for this teacher+subject+class
-      const existingAssignment = await prisma.teacherAssignment.findUnique({
-        where: {
-          teacherId_subject_className: {
-            teacherId: targetTeacherId,
-            subject: trimmedSubject,
-            className: trimmedClassName,
-          },
-        },
+    // Determine the teacherId
+    let targetTeacherId = teacherId;
+    if (!targetTeacherId) {
+      const anyTeacher = await prisma.teacher.findFirst({
+        where: { status: 'ACTIVE' },
+        select: { id: true },
+        orderBy: { id: 'asc' },
       });
-
-      if (existingAssignment) {
-        finalAssignmentId = existingAssignment.id;
-      } else {
-        // Auto-create the assignment
-        const newAssignment = await prisma.teacherAssignment.create({
-          data: {
-            teacherId: targetTeacherId,
-            subject: trimmedSubject,
-            className: trimmedClassName,
-          },
-        });
-        finalAssignmentId = newAssignment.id;
+      if (!anyTeacher) {
+        return res.status(400).json({ error: 'No active teachers found. Create a teacher first or provide teacherId.' });
       }
+      targetTeacherId = anyTeacher.id;
     }
-
-    // Verify assignment exists
-    const assignment = await prisma.teacherAssignment.findUnique({
-      where: { id: finalAssignmentId },
-      include: { teacher: { select: { id: true, status: true } } },
-    });
-    if (!assignment) return res.status(404).json({ error: 'Assignment not found.' });
 
     const exam = await prisma.exam.create({
       data: {
-        assignmentId: finalAssignmentId,
         title: title.trim(),
         description: (description || '').trim() || null,
         type: type || 'TEST',
@@ -1347,10 +1099,13 @@ router.post('/exams/create', async (req, res) => {
         passMark: parseInt(passMark, 10) || 50,
         startDate: startDate || '',
         endDate: endDate || '',
-        resultVisibility: req.body.resultVisibility || 'IMMEDIATE',
+        resultVisibility: resultVisibility || 'IMMEDIATE',
+        className: className.trim(),
+        subject: subject.trim(),
+        teacherId: targetTeacherId,
       },
       include: {
-        assignment: { include: { teacher: { select: { firstName: true, lastName: true } } } },
+        teacher: { select: { firstName: true, lastName: true } },
       },
     });
 
@@ -1362,6 +1117,9 @@ router.post('/exams/create', async (req, res) => {
       duration: exam.duration,
       totalMarks: exam.totalMarks,
       passMark: exam.passMark,
+      subject: exam.subject,
+      className: exam.className,
+      teacherName: `${exam.teacher.firstName} ${exam.teacher.lastName}`,
       message: 'Exam created successfully. Add questions to it before publishing.',
     });
   } catch (error) {
@@ -1444,16 +1202,14 @@ router.get('/questions/exams', async (req, res) => {
       where: { status: 'DRAFT' },
       orderBy: { createdAt: 'desc' },
       include: {
-        assignment: {
-          include: { teacher: { select: { firstName: true, lastName: true } } },
-        },
+        teacher: { select: { firstName: true, lastName: true } },
         _count: { select: { questions: true } },
       },
     });
     res.json(exams.map(e => ({
       id: e.id, title: e.title, type: e.type,
-      subject: e.assignment.subject, className: e.assignment.className,
-      teacherName: `${e.assignment.teacher.firstName} ${e.assignment.teacher.lastName}`,
+      subject: e.subject, className: e.className,
+      teacherName: `${e.teacher.firstName} ${e.teacher.lastName}`,
       questionCount: e._count.questions, duration: e.duration, totalMarks: e.totalMarks,
       createdAt: e.createdAt,
     })));
@@ -1470,7 +1226,7 @@ router.get('/questions/:examId', async (req, res) => {
   try {
     const exam = await prisma.exam.findUnique({
       where: { id: req.params.examId },
-      include: { assignment: { include: { teacher: { select: { firstName: true, lastName: true } } } } },
+      include: { teacher: { select: { firstName: true, lastName: true } } },
     });
     if (!exam) return res.status(404).json({ error: 'Exam not found' });
     const questions = await prisma.examQuestion.findMany({
@@ -1478,7 +1234,7 @@ router.get('/questions/:examId', async (req, res) => {
       orderBy: { createdAt: 'asc' },
     });
     res.json({
-      exam: { id: exam.id, title: exam.title, status: exam.status, subject: exam.assignment.subject, className: exam.assignment.className },
+      exam: { id: exam.id, title: exam.title, status: exam.status, subject: exam.subject, className: exam.className },
       questions,
     });
   } catch (error) {

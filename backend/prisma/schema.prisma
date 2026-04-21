@@ -42,47 +42,35 @@ model Teacher {
   status    String  @default("ACTIVE")
   subjects  String  @default("[]")
 
-  user        User               @relation(fields: [id], references: [id], onDelete: Cascade)
-  assignments TeacherAssignment[]
+  user   User   @relation(fields: [id], references: [id], onDelete: Cascade)
+  exams  Exam[]
 
   @@map("teachers")
 }
 
-model TeacherAssignment {
-  id           String @id @default(uuid())
-  teacherId    String @map("teacher_id")
-  subject      String
-  className    String @default("JSS1") @map("class_name")
-  academicYear String @default("2024/2025") @map("academic_year")
-
-  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  exams   Exam[]
-
-  @@unique([teacherId, subject, className])
-  @@map("teacher_assignments")
-}
-
 model Exam {
-  id               String            @id @default(uuid())
+  id               String   @id @default(uuid())
   title            String
   description      String?
-  type             String            @default("TEST")
-  status           String            @default("DRAFT")
+  type             String   @default("TEST")
+  status           String   @default("DRAFT")
   duration         Int
-  totalMarks       Int               @default(100)
-  passMark         Int               @default(50)
-  startDate        String            @default("")
-  endDate          String            @default("")
-  resultVisibility String            @default("IMMEDIATE") @map("result_visibility")
-  shuffleQuestions Int               @default(1) @map("shuffle_questions")
-  shuffleOptions   Int               @default(1) @map("shuffle_options")
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
+  totalMarks       Int      @default(100)
+  passMark         Int      @default(50)
+  startDate        String   @default("")
+  endDate          String   @default("")
+  resultVisibility String   @default("IMMEDIATE") @map("result_visibility")
+  shuffleQuestions Int      @default(1) @map("shuffle_questions")
+  shuffleOptions   Int      @default(1) @map("shuffle_options")
+  className        String   @default("JSS1") @map("class_name")
+  subject          String
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
-  assignmentId String            @map("assignment_id")
-  assignment   TeacherAssignment @relation(fields: [assignmentId], references: [id])
-  questions    ExamQuestion[]
-  results      Result[]
+  teacherId String  @map("teacher_id")
+  teacher   Teacher @relation(fields: [teacherId], references: [id])
+  questions ExamQuestion[]
+  results   Result[]
 
   @@map("exams")
 }

@@ -14,7 +14,6 @@ export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState('exams');
   const [exams, setExams] = useState([]);
   const [results, setResults] = useState([]);
-  const [assignments, setAssignments] = useState([]);
   const [stats, setStats] = useState({ total: 0, published: 0, draft: 0 });
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -31,16 +30,10 @@ export default function TeacherDashboard() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [examsRes, assignRes] = await Promise.all([
-        api.get('/exams/teacher'),
-        api.get('/exams/teacher/assignments'),
-      ]);
+      const examsRes = await api.get('/exams/teacher');
       const examList = examsRes.data.exams || [];
       setExams(examList);
       setStats({ total: examList.length, published: examList.filter(e => e.status === 'PUBLISHED').length, draft: examList.filter(e => e.status === 'DRAFT').length });
-
-      // Get assignments for this teacher
-      setAssignments(assignRes.data.assignments || []);
     } catch { toast.error('Failed to load data'); }
     finally { setLoading(false); }
   }, [user?.id]);
@@ -157,7 +150,6 @@ export default function TeacherDashboard() {
             { icon: FileText, label: 'Total Exams', value: stats.total, bgClass: 'bg-blue-100', textClass: 'text-blue-600' },
             { icon: Eye, label: 'Published', value: stats.published, bgClass: 'bg-green-100', textClass: 'text-green-600' },
             { icon: Edit3, label: 'Drafts', value: stats.draft, bgClass: 'bg-yellow-100', textClass: 'text-yellow-600' },
-            { icon: Users, label: 'Assignments', value: assignments.length, bgClass: 'bg-purple-100', textClass: 'text-purple-600' },
           ].map(({ icon: Icon, label, value, bgClass, textClass }) => (
             <div key={label} className="card flex items-center gap-4">
               <div className={`w-12 h-12 ${bgClass} rounded-xl flex items-center justify-center`}><Icon className={`w-6 h-6 ${textClass}`} /></div>
@@ -201,7 +193,7 @@ export default function TeacherDashboard() {
                 {exams.map(exam => (
                   <tr key={exam.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3"><p className="text-sm font-medium text-gray-800">{exam.title}</p><p className="text-xs text-gray-400">{exam.type} | {exam.duration}min</p></td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{exam.assignment?.subject} ({exam.assignment?.className})</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{exam.subject} ({exam.className})</td>
                     <td className="px-4 py-3 text-sm text-center">{exam._count?.questions || 0}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`badge ${exam.status === 'PUBLISHED' ? 'badge-green' : exam.status === 'DRAFT' ? 'badge-yellow' : 'badge-gray'}`}>{exam.status}</span>

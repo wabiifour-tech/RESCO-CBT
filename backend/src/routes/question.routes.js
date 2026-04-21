@@ -37,9 +37,8 @@ async function verifyTeacherOwnsExam(teacherId, examId) {
   const exam = await prisma.exam.findFirst({
     where: {
       id: examId,
-      assignment: { teacherId },
+      teacherId,
     },
-    include: { assignment: true },
   });
   return exam;
 }
@@ -485,7 +484,7 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
       where: { id },
       include: {
         exam: {
-          include: { assignment: true },
+          select: { teacherId: true, status: true },
         },
       },
     });
@@ -498,7 +497,7 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
     }
 
     // --- Verify exam belongs to this teacher ---
-    if (question.exam.assignment.teacherId !== req.user.userId) {
+    if (question.exam.teacherId !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to this question.',
@@ -545,7 +544,7 @@ router.delete('/:id', authenticate, requireRole('TEACHER'), async (req, res) => 
       where: { id },
       include: {
         exam: {
-          include: { assignment: true },
+          select: { teacherId: true, status: true },
         },
       },
     });
@@ -558,7 +557,7 @@ router.delete('/:id', authenticate, requireRole('TEACHER'), async (req, res) => 
     }
 
     // --- Verify exam belongs to this teacher ---
-    if (question.exam.assignment.teacherId !== req.user.userId) {
+    if (question.exam.teacherId !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to this question.',

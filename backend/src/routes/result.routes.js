@@ -24,7 +24,7 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
     // Verify exam is published and accessible
     const exam = await prisma.exam.findUnique({
       where: { id: examId },
-      include: { assignment: { select: { subject: true, className: true } } },
+      select: { id: true, title: true, status: true, subject: true, className: true, resultVisibility: true, endDate: true },
     });
 
     if (!exam) {
@@ -150,7 +150,8 @@ router.get('/student', authenticate, requireRole('STUDENT'), async (req, res) =>
             title: true,
             type: true,
             duration: true,
-            assignment: { select: { subject: true, className: true } },
+            subject: true,
+            className: true,
           },
         },
       },
@@ -172,7 +173,7 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
     const result = await prisma.result.findUnique({
       where: { examId_studentId: { examId, studentId: req.user.userId } },
       include: {
-        exam: { include: { assignment: { select: { subject: true } } } },
+        exam: { select: { id: true, title: true, subject: true, resultVisibility: true, endDate: true } },
         answers: { include: { question: { select: { question: true, optionA: true, optionB: true, optionC: true, optionD: true, answer: true } } } },
       },
     });
@@ -213,14 +214,8 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
   try {
     const { examId, className, page = 1, limit = 20 } = req.query;
 
-    const assignments = await prisma.teacherAssignment.findMany({
-      where: { teacherId: req.user.userId },
-      select: { id: true },
-    });
-    const assignmentIds = assignments.map(a => a.id);
-
     const where = {
-      exam: { assignmentId: { in: assignmentIds } },
+      exam: { teacherId: req.user.userId },
     };
 
     if (examId) where.examId = examId;
@@ -233,7 +228,7 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
       prisma.result.findMany({
         where,
         include: {
-          exam: { select: { title: true, type: true, assignment: { select: { subject: true, className: true } } } },
+          exam: { select: { title: true, type: true, subject: true, className: true } },
           student: { select: { admissionNo: true, firstName: true, lastName: true, className: true } },
         },
         orderBy: { submittedAt: 'desc' },
@@ -283,7 +278,7 @@ router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER'), asy
     const { examId } = req.params;
 
     const exam = await prisma.exam.findFirst({
-      where: { id: examId, assignment: { teacherId: req.user.userId } },
+      where: { id: examId, teacherId: req.user.userId },
     });
 
     if (!exam) {
@@ -343,12 +338,9 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
 
     // Verify exam belongs to teacher
     const exam = await prisma.exam.findFirst({
-      where: { id: examId, assignment: { teacherId: req.user.userId } },
+      where: { id: examId, teacherId: req.user.userId },
       include: {
-        assignment: {
-          select: { subject: true, className: true },
-          include: { teacher: { select: { firstName: true, lastName: true } } },
-        },
+        teacher: { select: { firstName: true, lastName: true } },
       },
     });
 
@@ -393,11 +385,11 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
     }
 
     // PDF format with watermark
-    const teacherName = exam.assignment.teacher
-      ? `${exam.assignment.teacher.firstName} ${exam.assignment.teacher.lastName}`
+    const teacherName = exam.teacher
+      ? `${exam.teacher.firstName} ${exam.teacher.lastName}`
       : 'Teacher';
-    const subject = exam.assignment.subject;
-    const className = exam.assignment.className;
+    const subject = exam.subject;
+    const className = exam.className;
 
     const doc = new PDFDocument({
       size: 'A4',

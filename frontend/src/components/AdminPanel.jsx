@@ -32,7 +32,6 @@ const NAV_ITEMS = [
   { id: 'students',    label: 'Students',    icon: GraduationCap },
   { id: 'exams',       label: 'Exams',       icon: BookOpen },
   { id: 'questions',   label: 'Questions',   icon: FileQuestion },
-  { id: 'assignments', label: 'Assignments', icon: Award },
   { id: 'analytics',   label: 'Analytics',   icon: TrendingUp },
 ];
 
@@ -93,7 +92,6 @@ export default function AdminPanel() {
   const [dashboard, setDashboard] = useState(null);
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
-  const [assignments, setAssignments] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [draftExams, setDraftExams] = useState([]);
   const [allExams, setAllExams] = useState([]);
@@ -116,7 +114,6 @@ export default function AdminPanel() {
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
-  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
   const [manualQuestions, setManualQuestions] = useState(
     Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })
@@ -125,7 +122,6 @@ export default function AdminPanel() {
   // Form data
   const [teacherForm, setTeacherForm] = useState({ firstName: '', lastName: '', username: '', password: '' });
   const [studentForm, setStudentForm] = useState({ firstName: '', lastName: '', admissionNo: '', className: '', email: '', password: '' });
-  const [assignmentForm, setAssignmentForm] = useState({ teacherId: '', subject: '', className: 'JSS1' });
 
   // Sidebar responsive state
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -159,18 +155,6 @@ export default function AdminPanel() {
       setStudents(res.data.students || []);
     } catch (err) {
       toast.error('Failed to load students');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchAssignments = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/admin/assignments');
-      setAssignments(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      toast.error('Failed to load assignments');
     } finally {
       setLoading(false);
     }
@@ -230,11 +214,10 @@ export default function AdminPanel() {
     if (activeTab === 'dashboard') fetchDashboard();
     else if (activeTab === 'teachers') fetchTeachers();
     else if (activeTab === 'students') fetchStudents();
-    else if (activeTab === 'assignments') fetchAssignments();
     else if (activeTab === 'analytics') fetchAnalytics();
     else if (activeTab === 'questions') fetchDraftExams();
     else if (activeTab === 'exams') fetchAllExams();
-  }, [activeTab, fetchDashboard, fetchTeachers, fetchStudents, fetchAssignments, fetchAnalytics, fetchDraftExams, fetchAllExams]);
+  }, [activeTab, fetchDashboard, fetchTeachers, fetchStudents, fetchAnalytics, fetchDraftExams, fetchAllExams]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleLogout = () => {
@@ -320,30 +303,6 @@ export default function AdminPanel() {
       fetchStudents();
     } catch (err) {
       toast.error('Failed to delete student');
-    }
-  };
-
-  const handleDeleteAssignment = async (id) => {
-    if (!window.confirm('Delete this assignment?')) return;
-    try {
-      await api.delete('/admin/assignments/' + id);
-      toast.success('Assignment deleted');
-      fetchAssignments();
-    } catch (err) {
-      toast.error('Failed to delete assignment');
-    }
-  };
-
-  const handleCreateAssignment = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/admin/assignments', assignmentForm);
-      toast.success('Assignment created successfully');
-      setShowAssignmentModal(false);
-      setAssignmentForm({ teacherId: '', subject: '', className: 'JSS1' });
-      fetchAssignments();
-    } catch (err) {
-      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to create assignment');
     }
   };
 
@@ -887,126 +846,6 @@ export default function AdminPanel() {
                   onMouseLeave={(e) => { e.currentTarget.style.background = '#fee2e2'; }}
                 >
                   <Trash2 size={14} /> Delete
-                </button>
-              </div>
-            ))}
-          </div>
-        )
-      )}
-    </div>
-  );
-
-  // ─── Tab Content: Assignments ───────────────────────────────────────────────
-  const renderAssignments = () => (
-    <div style={{ animation: 'fadeIn 0.35s ease both' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
-        <div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Subject Assignments</h2>
-          <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0 0' }}>Teacher-to-class subject mappings</p>
-        </div>
-        <button
-          onClick={() => setShowAssignmentModal(true)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '10px 20px', borderRadius: 12, border: 'none',
-            background: 'linear-gradient(135deg, #f59e0b, #f97316)',
-            color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(245,158,11,0.35)',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(245,158,11,0.45)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(245,158,11,0.35)'; }}
-        >
-          <Plus size={17} /> Create Assignment
-        </button>
-      </div>
-
-      {loading ? renderLoader() : (
-        assignments.length === 0 ? (
-          <div style={cardBase}>
-            <div style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
-              <BookOpen size={40} style={{ marginBottom: 12, opacity: 0.5 }} />
-              <p style={{ fontSize: 15, fontWeight: 500 }}>No assignments found</p>
-            </div>
-          </div>
-        ) : (
-          <div style={{
-            ...cardBase,
-            overflow: 'hidden',
-            animation: 'fadeInUp 0.4s ease both',
-          }}>
-            {/* Table header */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '2fr 1.5fr 1fr 1fr 80px',
-              gap: 16,
-              padding: '14px 24px',
-              background: '#f8fafc',
-              borderBottom: '2px solid #e2e8f0',
-              fontSize: 12,
-              fontWeight: 700,
-              color: '#64748b',
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-            }}>
-              <span>Teacher</span>
-              <span>Subject</span>
-              <span>Class</span>
-              <span>Exams</span>
-              <span>Action</span>
-            </div>
-
-            {assignments.map((a, idx) => (
-              <div
-                key={a.id || idx}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '2fr 1.5fr 1fr 1fr 80px',
-                  gap: 16,
-                  padding: '16px 24px',
-                  borderBottom: idx < assignments.length - 1 ? '1px solid #f1f5f9' : 'none',
-                  alignItems: 'center',
-                  fontSize: 14,
-                  color: '#334155',
-                  transition: 'background 0.15s ease',
-                  animation: 'fadeInUp 0.35s ease ' + (idx * 0.05) + 's both',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <span style={{ fontWeight: 600, color: '#1e293b' }}>
-                  {a.teacherName || (a.teacherId ? 'Teacher' : 'Unknown')}
-                </span>
-                <span style={{
-                  padding: '3px 10px', borderRadius: 6,
-                  background: '#fef3c7', color: '#92400e',
-                  fontWeight: 500, fontSize: 13, display: 'inline-block', width: 'fit-content',
-                }}>
-                  {a.subject || 'N/A'}
-                </span>
-                <span>{a.className || 'N/A'}</span>
-                <span>
-                  <span style={{
-                    padding: '3px 10px', borderRadius: 6,
-                    background: '#e0e7ff', color: '#3730a3',
-                    fontWeight: 600, fontSize: 13,
-                  }}>
-                    {a.examCount !== undefined ? a.examCount : (a.numberOfExams || 0)}
-                  </span>
-                </span>
-                <button
-                  onClick={() => handleDeleteAssignment(a.id)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 34, height: 34, borderRadius: 8, border: 'none',
-                    background: '#fee2e2', color: '#991b1b',
-                    cursor: 'pointer', transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#fecaca'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = '#fee2e2'; }}
-                  title="Delete assignment"
-                >
-                  <Trash2 size={15} />
                 </button>
               </div>
             ))}
@@ -1809,7 +1648,6 @@ export default function AdminPanel() {
       case 'students':    return renderStudents();
       case 'exams':       return renderExams();
       case 'questions':   return renderQuestions();
-      case 'assignments': return renderAssignments();
       case 'analytics':   return renderAnalytics();
       default:            return renderDashboard();
     }
@@ -2102,37 +1940,6 @@ export default function AdminPanel() {
       {/* ─── MODALS ────────────────────────────────────────────────────────── */}
       {renderTeacherModal()}
       {renderStudentModal()}
-
-      {/* Create Assignment Modal */}
-      {showAssignmentModal && (
-        <div onClick={function(e) { if (e.target === e.currentTarget) setShowAssignmentModal(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
-          <div style={{ ...cardBase, padding: 28, maxWidth: 480, width: '100%', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
-            <button onClick={() => setShowAssignmentModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Create Assignment</h2>
-            <form onSubmit={handleCreateAssignment} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Teacher *</label>
-                <select required value={assignmentForm.teacherId} onChange={(e) => setAssignmentForm({ ...assignmentForm, teacherId: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}>
-                  <option value="">Select a teacher...</option>
-                  {teachers.filter(function(t) { return t.status === 'ACTIVE'; }).map(function(t) { return <option key={t.id} value={t.id}>{t.firstName} {t.lastName} (@{t.username || t.email})</option>; })}
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Subject *</label>
-                <input type="text" required value={assignmentForm.subject} onChange={(e) => setAssignmentForm({ ...assignmentForm, subject: e.target.value })} placeholder="e.g. Mathematics" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Class *</label>
-                <select required value={assignmentForm.className} onChange={(e) => setAssignmentForm({ ...assignmentForm, className: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}>
-                  <option value="JSS1">JSS1</option><option value="JSS2">JSS2</option><option value="JSS3">JSS3</option>
-                  <option value="SSS1">SSS1</option><option value="SSS2">SSS2</option><option value="SSS3">SSS3</option>
-                </select>
-              </div>
-              <button type="submit" style={{ width: '100%', padding: '13px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #f59e0b, #f97316)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', boxShadow: '0 4px 14px rgba(245,158,11,0.35)', transition: 'all 0.2s ease' }}>Create Assignment</button>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

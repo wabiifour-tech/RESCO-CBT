@@ -1148,7 +1148,7 @@ export default function StudentDashboard() {
                           <span className="text-3xl">{icon}</span>
                           <div>
                             <p className="text-white font-bold text-base leading-tight">{exam.title}</p>
-                            <p className="text-white/70 text-xs mt-0.5">{exam.assignment ? exam.assignment.subject : ''} | {exam.assignment ? exam.assignment.className : ''}</p>
+                            <p className="text-white/70 text-xs mt-0.5">{exam.subject || ''} | {exam.className || ''}</p>
                           </div>
                         </div>
                       </div>
@@ -1223,7 +1223,7 @@ export default function StudentDashboard() {
                     <div className="flex items-start justify-between mb-3">
                       <div className="min-w-0 flex-1">
                         <h4 className="font-bold text-gray-800 text-sm truncate">{r.exam && r.exam.title}</h4>
-                        <p className="text-xs text-gray-400 mt-0.5">{r.exam && r.exam.assignment ? r.exam.assignment.subject : ''}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{r.exam ? (r.exam.subject || '') : ''}</p>
                       </div>
                       <div className={'flex-shrink-0 ml-2 px-3 py-1 rounded-lg text-xs font-bold ' + (passed
                         ? 'bg-green-100 text-green-700'
