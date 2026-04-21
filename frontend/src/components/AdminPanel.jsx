@@ -1843,8 +1843,13 @@ export default function AdminPanel() {
         }
         @media (min-width: 1024px) {
           .admin-sidebar {
-            position: sticky !important;
+            position: fixed !important;
             top: 0 !important;
+            left: 0 !important;
+            bottom: 0 !important;
+          }
+          .admin-main-content {
+            margin-left: 260px !important;
           }
           .admin-hamburger-btn {
             display: none !important;

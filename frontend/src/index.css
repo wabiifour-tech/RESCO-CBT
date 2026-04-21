@@ -702,7 +702,7 @@ a, button, input, select, textarea {
 }
 
 .resco-watermark img {
-  width: 550px;
+  width: 700px;
   height: auto;
   object-fit: contain;
   filter: grayscale(100%);
