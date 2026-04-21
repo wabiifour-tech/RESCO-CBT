@@ -1669,43 +1669,28 @@ export default function AdminPanel() {
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
-        /* Responsive sidebar */
-        @media (max-width: 1023px) {
-          .admin-sidebar {
-            position: fixed !important;
-            top: 0 !important; left: 0 !important; bottom: 0 !important;
-            transform: translateX(-100%);
-            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-            pointer-events: none;
-          }
-          .admin-sidebar.open {
-            transform: translateX(0) !important;
-            pointer-events: auto;
-          }
-          .admin-main-content {
-            margin-left: 0 !important;
-          }
-          .admin-hamburger-btn {
-            display: flex !important;
-          }
+        /* Sidebar — collapsible on ALL screen sizes */
+        .admin-sidebar {
+          position: fixed !important;
+          top: 0 !important; left: 0 !important; bottom: 0 !important;
+          transform: translateX(-100%);
+          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          pointer-events: none;
         }
-        @media (min-width: 1024px) {
-          .admin-sidebar {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            bottom: 0 !important;
-            pointer-events: auto;
-          }
-          .admin-main-content {
-            margin-left: 260px !important;
-          }
-          .admin-hamburger-btn {
-            display: none !important;
-          }
-          .admin-sidebar-close-btn {
-            display: none !important;
-          }
+        .admin-sidebar.open {
+          transform: translateX(0) !important;
+          pointer-events: auto;
+        }
+        .admin-main-content {
+          margin-left: 0 !important;
+        }
+        /* Hamburger always visible */
+        .admin-hamburger-btn {
+          display: flex !important;
+        }
+        /* Close button always visible inside sidebar */
+        .admin-sidebar-close-btn {
+          display: flex !important;
         }
       ` }} />
 
@@ -1779,7 +1764,7 @@ export default function AdminPanel() {
             className="admin-sidebar-close-btn"
             onClick={() => setSidebarOpen(false)}
             style={{
-              display: 'none', alignItems: 'center', justifyContent: 'center',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 32, height: 32, borderRadius: 8,
               background: 'rgba(255,255,255,0.1)', border: 'none',
               color: '#fff', cursor: 'pointer',
@@ -1913,7 +1898,6 @@ export default function AdminPanel() {
           overflowY: 'auto',
           minWidth: 0,
           position: 'relative',
-          marginLeft: 260,
         }}
       >
         {/* Hamburger menu button for mobile */}

@@ -58,3 +58,45 @@ Stage Summary:
 - Fix: Rewrote migrate-assignments.js with proper ALTER TABLE before data copy
 - All changes pushed to GitHub, Railway and Vercel will auto-deploy
 - Pushed commits: 6a0431d, 63feddb, e17e88e, fdd9c73, 9b52070
+---
+Task ID: 2
+Agent: Main
+Task: Fix sidebar auto-close and upload failures
+
+Work Log:
+- Cloned fresh repo (previous session had broken git rebase state)
+- Analyzed sidebar CSS: found `animation: sidebarSlideIn` conflicting with `transition: transform` on same property — prevented sidebar from closing
+- Analyzed upload code: found `Content-Type: multipart/form-data` manual override in axios causing browser boundary issues
+- Backend `$transaction` with large arrays could timeout on big CSV uploads
+
+Stage Summary:
+## FIXES APPLIED:
+
+### Sidebar auto-close fix (AdminPanel.jsx):
+- Removed `animation: sidebarSlideIn/sidebarSlideOut` keyframes
+- Use pure CSS `transition: transform 0.25s` for open/close
+- Added `pointer-events: none` when sidebar is closed (prevents tap-through blocking)
+- Sidebar now reliably closes when any nav item is tapped
+
+### Upload fix (AdminPanel.jsx + TeacherDashboard.jsx):
+- Removed manual `Content-Type: multipart/form-data` header override (let browser set boundary automatically)
+- Increased upload timeout from 30s to 120s for large files
+- Better error messages showing actual backend error details
+- Force `String()` cast on examId from FormData
+
+### Backend upload reliability (admin.routes.js):
+- Batch DB creates in groups of 50 to avoid Prisma transaction timeouts
+- Improved error logging with Prisma error codes and metadata
+
+### Deployment fix (nixpacks.toml):
+- Added `poppler` system package for `pdf-parse` to work on Railway
+
+## FILES MODIFIED:
+- frontend/src/components/AdminPanel.jsx
+- frontend/src/components/TeacherDashboard.jsx
+- backend/src/routes/admin.routes.js
+- backend/nixpacks.toml
+
+## BUILD VERIFICATION:
+- `vite build` succeeded with 0 errors
+- All changes pushed to GitHub (commit 334d7fd)

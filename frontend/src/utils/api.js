@@ -6,7 +6,6 @@ const API_BASE = import.meta.env.VITE_API_URL || 'https://resco-cbt-production.u
 
 const api = axios.create({
   baseURL: API_BASE,
-  headers: { 'Content-Type': 'application/json' },
   timeout: 30000, // 30 second timeout
 });
 
