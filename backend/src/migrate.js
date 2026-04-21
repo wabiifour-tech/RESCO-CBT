@@ -1,44 +1,41 @@
-// ── Self-healing migration for TeacherAssignment removal ──
-// Runs raw SQL directly via psql, completely independent of Prisma Client.
-// This MUST complete before Prisma Client connects, because the Prisma schema
-// expects class_name/subject/teacher_id columns on the exams table.
+// ── Schema sync: Ensure database matches Prisma schema ──
+// This runs prisma db push INSIDE the Node.js process before Prisma Client connects.
+// This is the most reliable approach because prisma CLI is already installed and
+// handles all column additions/drops/foreign key changes automatically.
 
 const { execSync } = require('child_process');
-const path = require('path');
 
-function runMigration() {
-  const sqlFile = path.join(__dirname, 'prisma', 'migration.sql');
-
+function syncSchema() {
   try {
-    console.log('[Migration] Starting database schema migration...');
+    console.log('[Schema Sync] Running prisma db push to sync database schema...');
 
-    // Extract the connection details from DATABASE_URL
-    // Format: postgresql://user:password@host:port/database
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) {
-      console.error('[Migration] ERROR: DATABASE_URL not set. Skipping migration.');
-      return;
-    }
-
-    // Run the SQL file using psql
-    const result = execSync(
-      `psql "${dbUrl}" -f "${sqlFile}" 2>&1`,
+    const output = execSync(
+      'npx prisma db push --skip-generate --accept-data-loss 2>&1',
       {
         encoding: 'utf-8',
-        timeout: 30000,
+        timeout: 60000,
+        cwd: require('path').join(__dirname, '..'),
         stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env },
       }
     );
 
-    console.log('[Migration] Output:', result.trim());
-    console.log('[Migration] Completed successfully.');
+    console.log('[Schema Sync] Output:', output.trim());
+    console.log('[Schema Sync] Completed successfully.');
   } catch (err) {
-    console.error('[Migration] Error running migration:', err.stderr || err.stdout || err.message);
-    console.error('[Migration] Attempting to continue anyway...');
+    // prisma db push may return non-zero exit code even on success for some operations
+    const output = (err.stdout || '') + (err.stderr || '');
+    console.log('[Schema Sync] Output:', output.trim());
+
+    if (output.includes('The database is already in sync') || output.includes('Everything is now in sync') || output.includes('Your database is now in sync')) {
+      console.log('[Schema Sync] Database was already in sync. OK.');
+    } else {
+      console.error('[Schema Sync] WARNING: prisma db push had issues. See output above.');
+    }
   }
 }
 
-// Run immediately on require (before server.js does anything with Prisma)
-runMigration();
+// Run immediately on require
+syncSchema();
 
-module.exports = { runMigration };
+module.exports = { syncSchema };
