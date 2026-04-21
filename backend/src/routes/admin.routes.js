@@ -1168,6 +1168,67 @@ router.patch('/exams/:id/publish', async (req, res) => {
 });
 
 // ============================================================
+// 15b2. PATCH /exams/:id/dates — Update Exam Schedule
+// ============================================================
+router.patch('/exams/:id/dates', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.body;
+
+    const exam = await prisma.exam.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!exam) return res.status(404).json({ error: 'Exam not found.' });
+    if (exam.status === 'ARCHIVED') return res.status(400).json({ error: 'Cannot edit dates for an archived exam.' });
+
+    // Validate dates if provided
+    if (startDate !== undefined && startDate !== null && startDate !== '') {
+      const start = new Date(startDate);
+      if (isNaN(start.getTime())) {
+        return res.status(400).json({ error: 'Invalid start date.' });
+      }
+    }
+
+    if (endDate !== undefined && endDate !== null && endDate !== '') {
+      const end = new Date(endDate);
+      if (isNaN(end.getTime())) {
+        return res.status(400).json({ error: 'Invalid end date.' });
+      }
+    }
+
+    // If both dates provided, validate that end is after start
+    if (startDate && endDate && new Date(endDate) <= new Date(startDate)) {
+      return res.status(400).json({ error: 'End date must be after start date.' });
+    }
+
+    const updateData = {};
+    if (startDate !== undefined) updateData.startDate = startDate || '';
+    if (endDate !== undefined) updateData.endDate = endDate || '';
+
+    const updated = await prisma.exam.update({
+      where: { id: req.params.id },
+      data: updateData,
+      select: {
+        id: true, title: true, status: true,
+        startDate: true, endDate: true,
+      },
+    });
+
+    res.json({
+      id: updated.id,
+      title: updated.title,
+      status: updated.status,
+      startDate: updated.startDate,
+      endDate: updated.endDate,
+      message: 'Exam schedule updated successfully.',
+    });
+  } catch (error) {
+    console.error('[Admin Update Exam Dates Error]', error);
+    res.status(500).json({ error: 'Failed to update exam schedule.' });
+  }
+});
+
+// ============================================================
 // 15c. PATCH /exams/:id/archive — Archive Exam
 // ============================================================
 router.patch('/exams/:id/archive', async (req, res) => {

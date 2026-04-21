@@ -243,18 +243,19 @@ router.get('/available', authenticate, requireRole('STUDENT'), async (req, res) 
 
     const examList = exams.map(exam => {
       const hasTaken = exam.results.length > 0;
-      // If no dates are set, treat as always open
+      // Determine if exam is currently open based on schedule
       let isOpen = false;
-      if (!exam.startDate || !exam.endDate) {
-        isOpen = true;
-      } else {
-        const start = new Date(exam.startDate);
-        const end = new Date(exam.endDate);
-        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-          isOpen = start <= now && end >= now;
-        } else {
-          isOpen = true; // invalid dates treated as open
-        }
+      const hasStart = exam.startDate && !isNaN(new Date(exam.startDate).getTime());
+      const hasEnd = exam.endDate && !isNaN(new Date(exam.endDate).getTime());
+
+      if (!hasStart && !hasEnd) {
+        isOpen = true; // No schedule at all — always open
+      } else if (hasStart && hasEnd) {
+        isOpen = new Date(exam.startDate) <= now && new Date(exam.endDate) >= now;
+      } else if (hasStart && !hasEnd) {
+        isOpen = new Date(exam.startDate) <= now; // Only start set — opens at start, no deadline
+      } else if (!hasStart && hasEnd) {
+        isOpen = new Date(exam.endDate) >= now; // Only end set — open now, closes at end
       }
       const { results, ...examData } = exam;
       return { ...examData, hasTaken, isOpen };
@@ -300,15 +301,15 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
       return res.status(400).json({ success: false, message: 'This exam is not available.' });
     }
 
-    // Check date constraints — if no dates set or invalid, allow access
-    if (exam.startDate && exam.endDate) {
-      const start = new Date(exam.startDate);
-      const end = new Date(exam.endDate);
-      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-        if (start > now || end < now) {
-          return res.status(400).json({ success: false, message: 'This exam is not currently open.' });
-        }
-      }
+    // Check date constraints — respect partial schedules
+    const hasStart = exam.startDate && !isNaN(new Date(exam.startDate).getTime());
+    const hasEnd = exam.endDate && !isNaN(new Date(exam.endDate).getTime());
+
+    if (hasStart && new Date(exam.startDate) > now) {
+      return res.status(400).json({ success: false, message: 'This exam is not open yet.' });
+    }
+    if (hasEnd && new Date(exam.endDate) < now) {
+      return res.status(400).json({ success: false, message: 'This exam has closed.' });
     }
 
     // Check student hasn't already taken it

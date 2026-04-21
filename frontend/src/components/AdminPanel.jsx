@@ -9,7 +9,7 @@ import {
   LogOut, BookOpen, Users, UserCheck, UserX, UserPlus, BarChart3, Trash2,
   X, Eye, Shield, GraduationCap, TrendingUp, Clock, CheckCircle, XCircle,
   Search, Download, Settings, ChevronRight, Sparkles, School, Award,
-  Upload, FileQuestion, Plus, Minus, Menu
+  Upload, FileQuestion, Plus, Minus, Menu, Calendar
 } from 'lucide-react';
 
 // ─── Color Maps (avoid template-literal classNames) ────────────────────────────
@@ -114,6 +114,9 @@ export default function AdminPanel() {
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
+  const [showDatesModal, setShowDatesModal] = useState(false);
+  const [datesExam, setDatesExam] = useState(null);
+  const [datesForm, setDatesForm] = useState({ startDate: '', endDate: '' });
   const [uploadFile, setUploadFile] = useState(null);
   const [manualQuestions, setManualQuestions] = useState(
     Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })
@@ -307,6 +310,39 @@ export default function AdminPanel() {
   };
 
   // ─── Exam Handlers ────────────────────────────────────────────────────
+  const openDatesModal = (exam) => {
+    setDatesExam(exam);
+    // Convert ISO or empty string to datetime-local format
+    const toLocal = (val) => {
+      if (!val) return '';
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return '';
+      // Format as YYYY-MM-DDTHH:MM for datetime-local input
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    setDatesForm({ startDate: toLocal(exam.startDate), endDate: toLocal(exam.endDate) });
+    setShowDatesModal(true);
+  };
+
+  const handleUpdateDates = async (e) => {
+    e.preventDefault();
+    if (!datesExam) return;
+    try {
+      const res = await api.patch('/admin/exams/' + datesExam.id + '/dates', {
+        startDate: datesForm.startDate,
+        endDate: datesForm.endDate,
+      });
+      toast.success(res.data.message);
+      setShowDatesModal(false);
+      setDatesExam(null);
+      fetchAllExams();
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to update dates';
+      toast.error(msg, { duration: 6000 });
+    }
+  };
+
   const handleCreateExam = async (e) => {
     e.preventDefault();
     try {
@@ -1538,7 +1574,28 @@ export default function AdminPanel() {
                   <span style={{ padding: '3px 10px', borderRadius: 6, background: '#f1f5f9', color: '#475569', fontWeight: 600 }}>{ex.totalMarks} marks</span>
                 </div>
                 <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>By {ex.teacherName} &middot; {ex.questionCount} Qs &middot; {ex.resultCount} results</div>
+
+                {/* Schedule Info */}
+                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14, padding: '8px 12px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: (ex.startDate || ex.endDate) ? 4 : 0 }}>
+                    <Calendar size={13} style={{ color: '#6366f1' }} />
+                    <span style={{ fontWeight: 600, color: '#475569' }}>Schedule:</span>
+                    {(ex.startDate || ex.endDate) ? (
+                      <span style={{ color: '#334155' }}>
+                        {ex.startDate ? 'Starts ' + new Date(ex.startDate).toLocaleString() : 'No start set'}
+                        {ex.startDate && ex.endDate ? ' · ' : ''}
+                        {ex.endDate ? 'Ends ' + new Date(ex.endDate).toLocaleString() : 'No end set'}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#f59e0b', fontWeight: 600 }}>No schedule set — always open to students</span>
+                    )}
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {(ex.status === 'DRAFT' || ex.status === 'PUBLISHED') && (
+                    <button onClick={() => openDatesModal(ex)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#eef2ff', color: '#4338ca', fontWeight: 600, fontSize: 12, cursor: 'pointer', transition: 'all 0.2s ease' }}><Calendar size={14} /> Edit Schedule</button>
+                  )}
                   {ex.status === 'DRAFT' && (
                     <button onClick={() => handlePublishExam(ex.id)} style={{ ...btnGrad, background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 4px 14px rgba(34,197,94,0.35)', fontSize: 12, padding: '7px 14px' }}>Publish</button>
                   )}
@@ -1641,6 +1698,45 @@ export default function AdminPanel() {
                   </select>
                 </div>
                 <button type="submit" style={{ width: '100%', padding: '13px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)', transition: 'all 0.2s ease' }}>Create Exam</button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Schedule Modal */}
+        {showDatesModal && datesExam && (
+          <div onClick={function(e) { if (e.target === e.currentTarget) { setShowDatesModal(false); setDatesExam(null); } }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+            <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 25px 50px rgba(0,0,0,0.15)', padding: 28, maxWidth: 480, width: '100%', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
+              <button onClick={() => { setShowDatesModal(false); setDatesExam(null); }} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 6px 0' }}>Edit Exam Schedule</h2>
+              <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px 0' }}>
+                Editing schedule for: <strong style={{ color: '#4338ca' }}>{datesExam.title}</strong>
+              </p>
+              <form onSubmit={handleUpdateDates} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Calendar size={13} /> Start Date & Time</span>
+                  </label>
+                  <input type="datetime-local" value={datesForm.startDate} onChange={(e) => setDatesForm({ ...datesForm, startDate: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} placeholder="Leave empty to not restrict" />
+                  <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Leave empty if students should be able to start immediately</p>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Calendar size={13} /> End Date & Time</span>
+                  </label>
+                  <input type="datetime-local" value={datesForm.endDate} onChange={(e) => setDatesForm({ ...datesForm, endDate: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} placeholder="Leave empty for no deadline" />
+                  <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Leave empty if there is no deadline for this exam</p>
+                </div>
+                <div style={{ padding: '10px 14px', borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                  <p style={{ fontSize: 12, color: '#1e40af', fontWeight: 600, margin: '0 0 4px 0' }}>How scheduling works:</p>
+                  <ul style={{ fontSize: 12, color: '#3b82f6', margin: 0, paddingLeft: 16, lineHeight: 1.6 }}>
+                    <li><strong>Both set:</strong> Exam opens at start time and closes at end time</li>
+                    <li><strong>Both empty:</strong> Exam is always open to students</li>
+                    <li><strong>Only start set:</strong> Exam opens at start time, no deadline</li>
+                    <li><strong>Only end set:</strong> Exam is open now, closes at end time</li>
+                  </ul>
+                </div>
+                <button type="submit" style={{ width: '100%', padding: '13px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)', transition: 'all 0.2s ease' }}>Save Schedule</button>
               </form>
             </div>
           </div>
