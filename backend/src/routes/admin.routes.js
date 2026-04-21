@@ -370,8 +370,17 @@ router.delete('/teachers/:id', async (req, res) => {
       return res.status(403).json({ error: 'Cannot delete an admin user' });
     }
 
-    // Delete in a transaction: teacher + user (cascade handles related records)
+    // Delete in a transaction: first remove dependent records, then teacher + user
     await prisma.$transaction(async (tx) => {
+      // Delete exams owned by this teacher (and their questions/results/answers)
+      const exams = await tx.exam.findMany({ where: { teacherId: id }, select: { id: true } });
+      if (exams.length > 0) {
+        const examIds = exams.map(e => e.id);
+        await tx.resultAnswer.deleteMany({ where: { question: { examId: { in: examIds } } } });
+        await tx.result.deleteMany({ where: { examId: { in: examIds } } });
+        await tx.examQuestion.deleteMany({ where: { examId: { in: examIds } } });
+        await tx.exam.deleteMany({ where: { teacherId: id } });
+      }
       await tx.teacher.delete({ where: { id } });
       await tx.user.delete({ where: { id } });
     });
@@ -947,12 +956,17 @@ router.get('/analytics', async (req, res) => {
       endDate: exam.endDate,
     }));
 
+    // 6. Pass/Fail overview
+    const passedCount = allResults.filter(r => r.percentage >= (r.exam?.passMark || 50)).length;
+    const passFail = { passed: passedCount, failed: allResults.length - passedCount, total: allResults.length };
+
     res.json({
       performanceByClass,
       performanceBySubject,
       examCompletionRates,
       topStudents: topStudentsData,
       recentlyActiveExams: recentExams,
+      passFail,
     });
   } catch (error) {
     console.error('[Admin Analytics Error]', error);

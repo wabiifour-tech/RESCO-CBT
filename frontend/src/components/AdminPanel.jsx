@@ -932,7 +932,7 @@ export default function AdminPanel() {
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {classPerformance.map((cp, idx) => {
-                const pct = cp.average !== undefined ? cp.average : (cp.percentage || 0);
+                const pct = cp.averageScore !== undefined ? cp.averageScore : 0;
                 const barColor = pct >= 70 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
                 return (
                   <div key={idx}>
@@ -966,7 +966,7 @@ export default function AdminPanel() {
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {subjectPerformance.map((sp, idx) => {
-                const pct = sp.average !== undefined ? sp.average : (sp.percentage || 0);
+                const pct = sp.averageScore !== undefined ? sp.averageScore : 0;
                 const barColor = pct >= 70 ? '#6366f1' : pct >= 50 ? '#f59e0b' : '#ef4444';
                 return (
                   <div key={idx}>
@@ -1727,6 +1727,10 @@ export default function AdminPanel() {
           height: '100vh',
           overflowY: 'auto',
           zIndex: 100,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
         }}>
         {/* Logo / Brand */}
         <div style={{
@@ -1900,6 +1904,7 @@ export default function AdminPanel() {
           overflowY: 'auto',
           minWidth: 0,
           position: 'relative',
+          marginLeft: 260,
         }}
       >
         {/* Hamburger menu button for mobile */}

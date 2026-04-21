@@ -205,6 +205,7 @@ export default function LoginPage() {
 
       setUser(data.user, data.token);
       const displayName = data.user.firstName
+        || (data.user.student && (data.user.student.firstName + ' ' + data.user.student.lastName))
         || (data.user.teacher && (data.user.teacher.firstName + ' ' + data.user.teacher.lastName))
         || data.user.fullName
         || data.user.email || '';

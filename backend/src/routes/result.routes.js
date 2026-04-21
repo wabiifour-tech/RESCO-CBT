@@ -123,7 +123,7 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
           questionId: a.questionId,
           question: question ? question.question : '',
           selected: a.selected,
-          correct: a.correct === 1 === 1,
+          correct: a.correct === 1,
           correctAnswer: question ? question.answer : null,
         };
       });
@@ -247,7 +247,7 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
     const avgScore = allResults.length > 0 ? allResults.reduce((s, r) => s + r.percentage, 0) / allResults.length : 0;
     const highest = allResults.length > 0 ? Math.max(...allResults.map(r => r.percentage)) : 0;
     const lowest = allResults.length > 0 ? Math.min(...allResults.map(r => r.percentage)) : 0;
-    const passRate = allResults.length > 0 ? (allResults.filter(r => r.percentage >= 50).length / allResults.length) * 100 : 0;
+    const passRate = allResults.length > 0 ? (allResults.filter(r => r.percentage >= (r.exam?.passMark || 50)).length / allResults.length) * 100 : 0;
 
     res.json({
       success: true,
@@ -318,7 +318,7 @@ router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER'), asy
       summary: {
         totalStudents: results.length,
         average: results.length > 0 ? Math.round(results.reduce((s, r) => s + r.percentage, 0) / results.length * 10) / 10 : 0,
-        passRate: results.length > 0 ? Math.round(results.filter(r => r.percentage >= 50).length / results.length * 100) : 0,
+        passRate: results.length > 0 ? Math.round(results.filter(r => r.percentage >= (exam?.passMark || 50)).length / results.length * 100) : 0,
       },
     });
   } catch (error) {
