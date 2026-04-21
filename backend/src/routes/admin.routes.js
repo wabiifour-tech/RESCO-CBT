@@ -173,7 +173,7 @@ router.get('/teachers', async (req, res) => {
         email: t.user.email,
         status: t.status,
         subjects: JSON.parse(t.subjects || '[]'),
-        createdAt: t.createdAt,
+        createdAt: t.user.createdAt,
         assignmentCount: t._count.assignments,
       })),
       pagination: {
@@ -253,7 +253,7 @@ router.post('/teachers/create', async (req, res) => {
       lastName: teacher.lastName,
       username: teacher.username,
       status: teacher.status,
-      createdAt: teacher.createdAt,
+      createdAt: teacher.user.createdAt,
       message: 'Teacher created successfully',
     });
   } catch (error) {
@@ -1294,7 +1294,7 @@ router.post('/exams/create', async (req, res) => {
         const anyTeacher = await prisma.teacher.findFirst({
           where: { status: 'ACTIVE' },
           select: { id: true },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { id: 'asc' },
         });
         if (!anyTeacher) {
           return res.status(400).json({ error: 'No active teachers found. Create a teacher first or provide teacherId.' });
