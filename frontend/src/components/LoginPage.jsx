@@ -232,13 +232,13 @@ export default function LoginPage() {
   const activeRole = roles.find((r) => r.key === role);
 
   const getPlaceholder = () => {
-    if (role === 'STUDENT') return studentLoginMode === 'admissionNo' ? 'Enter your admission number' : 'Enter your full name';
+    if (role === 'STUDENT') return studentLoginMode === 'admissionNo' ? 'Enter your admission number' : 'Enter your first and last name (e.g. John Doe)';
     if (role === 'TEACHER') return 'Enter your username';
     return 'Enter admin email';
   };
 
   const getFieldLabel = () => {
-    if (role === 'STUDENT') return studentLoginMode === 'admissionNo' ? 'Admission Number' : 'Full Name';
+    if (role === 'STUDENT') return studentLoginMode === 'admissionNo' ? 'Admission Number' : 'Full Name (First & Last)';
     if (role === 'TEACHER') return 'Username';
     return 'Email Address';
   };

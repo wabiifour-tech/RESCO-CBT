@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import useAuthStore from '../store/authStore';
 import toast from 'react-hot-toast';
@@ -83,6 +84,7 @@ const hoverLift = {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AdminPanel() {
   const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
 
   // Tab state
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -114,6 +116,7 @@ export default function AdminPanel() {
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
   const [manualQuestions, setManualQuestions] = useState(
     Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })
@@ -122,6 +125,7 @@ export default function AdminPanel() {
   // Form data
   const [teacherForm, setTeacherForm] = useState({ firstName: '', lastName: '', username: '', password: '' });
   const [studentForm, setStudentForm] = useState({ firstName: '', lastName: '', admissionNo: '', className: '', email: '', password: '' });
+  const [assignmentForm, setAssignmentForm] = useState({ teacherId: '', subject: '', className: 'JSS1' });
 
   // Sidebar responsive state
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -236,6 +240,7 @@ export default function AdminPanel() {
   const handleLogout = () => {
     logout();
     toast.success('Logged out successfully');
+    navigate('/');
   };
 
   const handleCreateTeacher = async (e) => {
@@ -329,6 +334,19 @@ export default function AdminPanel() {
     }
   };
 
+  const handleCreateAssignment = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/admin/assignments', assignmentForm);
+      toast.success('Assignment created successfully');
+      setShowAssignmentModal(false);
+      setAssignmentForm({ teacherId: '', subject: '', className: 'JSS1' });
+      fetchAssignments();
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to create assignment');
+    }
+  };
+
   // ─── Exam Handlers ────────────────────────────────────────────────────
   const handleCreateExam = async (e) => {
     e.preventDefault();
@@ -411,11 +429,12 @@ export default function AdminPanel() {
   };
 
   const handleManualSubmit = async (e) => {
-    e.preventDefault();
+    e && e.preventDefault();
     if (!selectedExamId) { toast.error('Select an exam first'); return; }
     setUploading(true);
     try {
-      const res = await api.post('/admin/questions/manual', { examId: selectedExamId, questions: manualQuestions });
+      const filtered = manualQuestions.filter(function (q) { return q.question.trim(); });
+      const res = await api.post('/admin/questions/manual', { examId: selectedExamId, questions: filtered });
       toast.success(res.data.message);
       setShowManualModal(false);
       setManualQuestions(
@@ -878,9 +897,26 @@ export default function AdminPanel() {
   // ─── Tab Content: Assignments ───────────────────────────────────────────────
   const renderAssignments = () => (
     <div style={{ animation: 'fadeIn 0.35s ease both' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Subject Assignments</h2>
-        <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0 0' }}>Teacher-to-class subject mappings</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Subject Assignments</h2>
+          <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0 0' }}>Teacher-to-class subject mappings</p>
+        </div>
+        <button
+          onClick={() => setShowAssignmentModal(true)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '10px 20px', borderRadius: 12, border: 'none',
+            background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+            color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(245,158,11,0.35)',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(245,158,11,0.45)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(245,158,11,0.35)'; }}
+        >
+          <Plus size={17} /> Create Assignment
+        </button>
       </div>
 
       {loading ? renderLoader() : (
@@ -1509,7 +1545,7 @@ export default function AdminPanel() {
 
         {/* Upload CSV Modal */}
         {showUploadModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+          <div onClick={function(e) { if (e.target === e.currentTarget) setShowUploadModal(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
             <div style={{ ...cardBase, padding: 28, maxWidth: 540, width: '100%', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
               <button onClick={() => setShowUploadModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Upload Questions</h2>
@@ -1549,7 +1585,7 @@ export default function AdminPanel() {
 
         {/* Manual Add — Table-based Inline Editor */}
         {showManualModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+          <div onClick={function(e) { if (e.target === e.currentTarget) { setShowManualModal(false); setManualQuestions(Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })); } }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
             <div style={{ ...cardBase, padding: 28, maxWidth: '96vw', width: '96vw', maxHeight: '92vh', overflowY: 'auto', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
               <button onClick={() => { setShowManualModal(false); setManualQuestions(Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })); }} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Add Questions Manually</h2>
@@ -1609,7 +1645,7 @@ export default function AdminPanel() {
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                 <button type="button" onClick={function () { setManualQuestions([...manualQuestions, { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }]); }} style={{ ...btnPrimary, justifyContent: 'center', flex: 1 }}><Plus size={16} /> Add Row</button>
-                <button type="button" onClick={function (e) { e.preventDefault(); if (!selectedExamId) { toast.error('Select an exam first'); return; } setUploading(true); api.post('/admin/questions/manual', { examId: selectedExamId, questions: manualQuestions.filter(function (q) { return q.question.trim(); }) }).then(function (res) { toast.success(res.data.message); setShowManualModal(false); setManualQuestions(Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })); fetchExamQuestions(selectedExamId); fetchDraftExams(); }).catch(function (err) { toast.error(err.response?.data?.error || 'Failed to add questions'); }).finally(function () { setUploading(false); }); }} disabled={uploading} style={{ ...btnSuccess, justifyContent: 'center', flex: 2, opacity: uploading ? 0.6 : 1 }}>
+                <button type="button" onClick={handleManualSubmit} disabled={uploading} style={{ ...btnSuccess, justifyContent: 'center', flex: 2, opacity: uploading ? 0.6 : 1 }}>
                   {uploading ? 'Saving...' : 'Save All (' + manualQuestions.filter(function (q) { return q.question.trim(); }).length + ' questions)'}
                 </button>
               </div>
@@ -1684,7 +1720,7 @@ export default function AdminPanel() {
 
         {/* Create Exam Modal */}
         {showExamModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+          <div onClick={function(e) { if (e.target === e.currentTarget) setShowExamModal(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
             <div style={{ ...cardBase, padding: 28, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
               <button onClick={() => setShowExamModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Create New Exam</h2>
@@ -2059,6 +2095,37 @@ export default function AdminPanel() {
       {/* ─── MODALS ────────────────────────────────────────────────────────── */}
       {renderTeacherModal()}
       {renderStudentModal()}
+
+      {/* Create Assignment Modal */}
+      {showAssignmentModal && (
+        <div onClick={function(e) { if (e.target === e.currentTarget) setShowAssignmentModal(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+          <div style={{ ...cardBase, padding: 28, maxWidth: 480, width: '100%', position: 'relative', animation: 'scaleIn 0.25s ease both' }}>
+            <button onClick={() => setShowAssignmentModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Create Assignment</h2>
+            <form onSubmit={handleCreateAssignment} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Teacher *</label>
+                <select required value={assignmentForm.teacherId} onChange={(e) => setAssignmentForm({ ...assignmentForm, teacherId: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}>
+                  <option value="">Select a teacher...</option>
+                  {teachers.filter(function(t) { return t.status === 'ACTIVE'; }).map(function(t) { return <option key={t.id} value={t.id}>{t.firstName} {t.lastName} (@{t.username || t.email})</option>; })}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Subject *</label>
+                <input type="text" required value={assignmentForm.subject} onChange={(e) => setAssignmentForm({ ...assignmentForm, subject: e.target.value })} placeholder="e.g. Mathematics" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Class *</label>
+                <select required value={assignmentForm.className} onChange={(e) => setAssignmentForm({ ...assignmentForm, className: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}>
+                  <option value="JSS1">JSS1</option><option value="JSS2">JSS2</option><option value="JSS3">JSS3</option>
+                  <option value="SSS1">SSS1</option><option value="SSS2">SSS2</option><option value="SSS3">SSS3</option>
+                </select>
+              </div>
+              <button type="submit" style={{ width: '100%', padding: '13px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #f59e0b, #f97316)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', boxShadow: '0 4px 14px rgba(245,158,11,0.35)', transition: 'all 0.2s ease' }}>Create Assignment</button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

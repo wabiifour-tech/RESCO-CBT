@@ -99,9 +99,22 @@ export default function TeacherDashboard() {
     } catch (err) { toast.error(err.response?.data?.message || 'Upload failed'); }
   };
 
-  const handleExport = (examId, format = 'csv') => {
-    const baseUrl = import.meta.env.VITE_API_URL || 'https://resco-cbt-production.up.railway.app/api';
-    window.open(baseUrl + '/results/export/' + examId + '?format=' + format, '_blank');
+  const handleExport = async (examId, format = 'csv') => {
+    try {
+      const res = await api.get('/results/export/' + examId + '?format=' + format, { responseType: 'blob' });
+      const blob = new Blob([res.data]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'exam_results_' + examId + '.' + format;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Export downloaded!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Export failed');
+    }
   };
 
   const viewExamResults = async (examId) => {
