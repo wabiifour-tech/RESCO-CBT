@@ -9,8 +9,6 @@ cmds = ["npx prisma generate"]
 
 [phases.start]
 cmds = [
-  "npx prisma db execute --file ./prisma/migration.sql --schema ./prisma/schema.prisma",
-  "npx prisma db push --skip-generate --accept-data-loss",
-  "node prisma/seed.js || echo 'Seed failed, continuing with server start'",
+  "npx prisma db push --skip-generate --accept-data-loss || echo 'prisma db push skipped'",
   "node src/server.js"
 ]

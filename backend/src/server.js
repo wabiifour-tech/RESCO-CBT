@@ -5,6 +5,10 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 
+// ── CRITICAL: Run migration BEFORE importing Prisma ──
+// This ensures database columns exist before Prisma Client validates schema
+require('./migrate');
+
 const prisma = require('./config/database');
 
 // Route imports
