@@ -39,3 +39,22 @@ Stage Summary:
 ## BUILD VERIFICATION:
 - `vite build` succeeded with 0 errors
 - All changes pushed to GitHub (commit 104497c)
+---
+Task ID: 1
+Agent: Main
+Task: Fix "Failed to load exams" in admin dashboard
+
+Work Log:
+- Verified all assignment removal code from previous session was complete (0 assignment refs in backend routes, frontend, schema)
+- Found 6 unpushed commits including the full TeacherAssignment removal refactor
+- Discovered critical bug in migration script: it tried to UPDATE class_name/subject columns on exams table before those columns existed (prisma db push hadn't run yet)
+- Rewrote migration script to first ALTER TABLE ADD COLUMN IF NOT EXISTS for class_name, subject, teacher_id, then copy data
+- Added safety fallback in nixpacks.toml for migration script
+- Pushed all 6 commits to GitHub (571709f → 9b52070)
+
+Stage Summary:
+- Root cause: Migration script was broken - tried to write to columns that didn't exist yet
+- Also: 5 previous fix commits were never pushed to GitHub, so the live site was running old buggy code
+- Fix: Rewrote migrate-assignments.js with proper ALTER TABLE before data copy
+- All changes pushed to GitHub, Railway and Vercel will auto-deploy
+- Pushed commits: 6a0431d, 63feddb, e17e88e, fdd9c73, 9b52070
