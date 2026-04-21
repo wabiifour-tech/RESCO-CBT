@@ -694,7 +694,7 @@ a, button, input, select, textarea {
   height: 100%;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.05;
+  opacity: 0.20;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -702,7 +702,7 @@ a, button, input, select, textarea {
 }
 
 .resco-watermark img {
-  width: 200px;
+  width: 400px;
   height: auto;
   object-fit: contain;
   filter: grayscale(100%);
