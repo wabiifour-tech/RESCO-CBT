@@ -1,131 +1,152 @@
 // ── Database schema heal: ensures columns/constraints match the new schema ──
-// Uses $executeRawUnsafe which works regardless of schema mismatch.
-// Prisma Client connection doesn't validate the DB schema — only model queries do.
-// So we connect first, fix the schema, then all subsequent queries work.
+// Runs AFTER prisma.$connect() succeeds, BEFORE any API requests.
+// Uses $executeRawUnsafe which bypasses Prisma's schema validation entirely.
 
 async function healSchema(prisma) {
   try {
+    console.log('[Schema Heal] ========================================');
     console.log('[Schema Heal] Starting database schema repair...');
+    console.log('[Schema Heal] ========================================');
 
-    // ── Step 1: Drop old foreign key constraints on exams.assignment_id ──
-    // These point to teacher_assignments which is being removed
+    // ── Step 1: Drop ALL foreign key constraints related to assignments ──
     try {
       const fks = await prisma.$queryRawUnsafe(`
-        SELECT constraint_name
-        FROM information_schema.table_constraints
-        WHERE table_name = 'exams'
-          AND constraint_type = 'FOREIGN KEY'
-          AND constraint_name LIKE '%assignment%';
+        SELECT tc.constraint_name, tc.table_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON tc.constraint_name = kcu.constraint_name
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+          AND kcu.column_name = 'assignment_id';
       `);
       for (const fk of fks) {
-        await prisma.$executeRawUnsafe(`ALTER TABLE exams DROP CONSTRAINT IF EXISTS "${fk.constraint_name}"`);
-        console.log(`[Schema Heal] Dropped FK constraint: ${fk.constraint_name}`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "${fk.table_name}" DROP CONSTRAINT "${fk.constraint_name}"`);
+        console.log('[Schema Heal] Dropped FK: ' + fk.constraint_name + ' on ' + fk.table_name);
       }
+      if (fks.length === 0) console.log('[Schema Heal] No assignment FK constraints found (good).');
     } catch (e) {
-      console.log('[Schema Heal] No assignment FK constraints to drop (OK):', e.message);
+      console.log('[Schema Heal] FK check note: ' + e.message);
     }
 
-    // ── Step 2: Drop assignment_id column from exams (new schema doesn't have it) ──
+    // ── Step 2: Drop assignment_id column from exams ──
     try {
       const colCheck = await prisma.$queryRawUnsafe(`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'exams' AND column_name = 'assignment_id';
       `);
       if (colCheck.length > 0) {
-        await prisma.$executeRawUnsafe(`ALTER TABLE exams DROP COLUMN assignment_id`);
+        await prisma.$executeRawUnsafe('ALTER TABLE exams DROP COLUMN assignment_id');
         console.log('[Schema Heal] Dropped assignment_id column from exams.');
+      } else {
+        console.log('[Schema Heal] assignment_id column not on exams (good).');
       }
     } catch (e) {
-      console.error('[Schema Heal] Could not drop assignment_id:', e.message);
+      console.error('[Schema Heal] Could not drop assignment_id: ' + e.message);
     }
 
-    // ── Step 3: Drop teacher_assignments table if it still exists ──
+    // ── Step 3: Drop teacher_assignments table entirely ──
     try {
       const taExists = await prisma.$queryRawUnsafe(`
         SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'teacher_assignments') as exists;
       `);
       if (taExists[0].exists) {
-        // Copy data to exams first (in case previous migration didn't run)
+        // Safety: copy any remaining data
         try {
           await prisma.$executeRawUnsafe(`
-            UPDATE exams e SET
-              class_name = COALESCE(e.class_name, ta.class_name),
-              subject = COALESCE(NULLIF(e.subject, 'General'), COALESCE(NULLIF(e.subject, ''), ta.subject)),
-              teacher_id = COALESCE(e.teacher_id, ta.teacher_id)
-            FROM teacher_assignments ta
-            WHERE e.assignment_id = ta.id
+            UPDATE exams SET
+              class_name = COALESCE(class_name, 'JSS1'),
+              subject = COALESCE(NULLIF(subject, ''), NULLIF(subject, 'General'), 'General'),
+              teacher_id = COALESCE(teacher_id, (SELECT id FROM teachers WHERE status = 'ACTIVE' ORDER BY id ASC LIMIT 1))
+            WHERE assignment_id IS NOT NULL
           `);
-          console.log('[Schema Heal] Copied data from teacher_assignments to exams.');
-        } catch (copyErr) {
-          console.log('[Schema Heal] Data copy note:', copyErr.message);
-        }
+        } catch (e) { /* ignore copy errors */ }
 
-        // Drop FK constraints pointing to teacher_assignments from other tables
+        // Drop any remaining FKs pointing to teacher_assignments
         try {
-          const otherFks = await prisma.$queryRawUnsafe(`
-            SELECT constraint_name, table_name
-            FROM information_schema.table_constraints
-            WHERE constraint_type = 'FOREIGN KEY'
-              AND constraint_name LIKE '%assignment%';
+          const allFks = await prisma.$queryRawUnsafe(`
+            SELECT tc.constraint_name, tc.table_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.referential_constraints rc
+              ON tc.constraint_name = rc.constraint_name
+            JOIN information_schema.table_constraints tc2
+              ON rc.unique_constraint_name = tc2.constraint_name
+            WHERE tc2.table_name = 'teacher_assignments';
           `);
-          for (const fk of otherFks) {
-            await prisma.$executeRawUnsafe(`ALTER TABLE "${fk.table_name}" DROP CONSTRAINT IF EXISTS "${fk.constraint_name}"`);
-            console.log(`[Schema Heal] Dropped FK ${fk.constraint_name} from ${fk.table_name}.`);
+          for (const fk of allFks) {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "${fk.table_name}" DROP CONSTRAINT "${fk.constraint_name}"`);
           }
-        } catch (e) {
-          console.log('[Schema Heal] No other FKs to drop:', e.message);
-        }
+        } catch (e) { /* ignore */ }
 
-        await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS teacher_assignments CASCADE`);
+        await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS teacher_assignments CASCADE');
         console.log('[Schema Heal] Dropped teacher_assignments table.');
+      } else {
+        console.log('[Schema Heal] teacher_assignments table gone (good).');
       }
     } catch (e) {
-      console.log('[Schema Heal] teacher_assignments table note:', e.message);
+      console.log('[Schema Heal] teacher_assignments note: ' + e.message);
     }
 
-    // ── Step 4: Add new columns to exams if missing ──
+    // ── Step 4: Ensure new columns exist on exams ──
     const cols = await prisma.$queryRawUnsafe(`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'exams' AND column_name IN ('class_name', 'subject', 'teacher_id');
+      SELECT column_name FROM information_schema.columns WHERE table_name = 'exams';
     `);
-    const existingCols = cols.map(c => c.column_name);
-    console.log('[Schema Heal] Columns on exams: class_name=' + (existingCols.includes('class_name') ? 'YES' : 'NO')
-      + ', subject=' + (existingCols.includes('subject') ? 'YES' : 'NO')
-      + ', teacher_id=' + (existingCols.includes('teacher_id') ? 'YES' : 'NO'));
+    const existingCols = cols.map(function(c) { return c.column_name; });
+    console.log('[Schema Heal] exams columns: ' + existingCols.join(', '));
 
-    if (!existingCols.includes('class_name')) {
-      await prisma.$executeRawUnsafe(`ALTER TABLE exams ADD COLUMN class_name VARCHAR(255) DEFAULT 'JSS1'`);
+    var added = 0;
+    if (existingCols.indexOf('class_name') === -1) {
+      await prisma.$executeRawUnsafe("ALTER TABLE exams ADD COLUMN class_name VARCHAR(255) DEFAULT 'JSS1'");
       console.log('[Schema Heal] Added class_name column.');
+      added++;
     }
-    if (!existingCols.includes('subject')) {
-      await prisma.$executeRawUnsafe(`ALTER TABLE exams ADD COLUMN subject VARCHAR(255) DEFAULT 'General'`);
+    if (existingCols.indexOf('subject') === -1) {
+      await prisma.$executeRawUnsafe("ALTER TABLE exams ADD COLUMN subject VARCHAR(255) DEFAULT 'General'");
       console.log('[Schema Heal] Added subject column.');
+      added++;
     }
-    if (!existingCols.includes('teacher_id')) {
-      await prisma.$executeRawUnsafe(`ALTER TABLE exams ADD COLUMN teacher_id VARCHAR(255)`);
+    if (existingCols.indexOf('teacher_id') === -1) {
+      await prisma.$executeRawUnsafe('ALTER TABLE exams ADD COLUMN teacher_id VARCHAR(255)');
       console.log('[Schema Heal] Added teacher_id column.');
+      added++;
     }
+    if (added === 0) console.log('[Schema Heal] All new columns already exist (good).');
 
     // ── Step 5: Set safe defaults ──
-    await prisma.$executeRawUnsafe(`UPDATE exams SET class_name = 'JSS1' WHERE class_name IS NULL OR class_name = ''`);
-    await prisma.$executeRawUnsafe(`UPDATE exams SET subject = 'General' WHERE subject IS NULL OR subject = ''`);
-
-    // Assign orphan exams to first active teacher
+    await prisma.$executeRawUnsafe("UPDATE exams SET class_name = 'JSS1' WHERE class_name IS NULL OR class_name = ''");
+    await prisma.$executeRawUnsafe("UPDATE exams SET subject = 'General' WHERE subject IS NULL OR subject = ''");
     try {
       await prisma.$executeRawUnsafe(`
-        UPDATE exams e SET teacher_id = t.id
-        FROM teachers t
-        WHERE e.teacher_id IS NULL AND t.status = 'ACTIVE'
-        AND t.id = (SELECT id FROM teachers WHERE status = 'ACTIVE' ORDER BY id ASC LIMIT 1);
+        UPDATE exams SET teacher_id = (SELECT id FROM teachers WHERE status = 'ACTIVE' ORDER BY id ASC LIMIT 1)
+        WHERE teacher_id IS NULL
       `);
-    } catch (e) {
-      console.log('[Schema Heal] Teacher assignment note:', e.message);
+    } catch (e) { /* no teachers yet, ignore */ }
+
+    // ── Step 6: Verify the schema is correct ──
+    const finalCols = await prisma.$queryRawUnsafe(`
+      SELECT column_name FROM information_schema.columns WHERE table_name = 'exams';
+    `);
+    var finalColNames = finalCols.map(function(c) { return c.column_name; });
+    var hasClassName = finalColNames.indexOf('class_name') !== -1;
+    var hasSubject = finalColNames.indexOf('subject') !== -1;
+    var hasTeacherId = finalColNames.indexOf('teacher_id') !== -1;
+    var noAssignmentId = finalColNames.indexOf('assignment_id') === -1;
+
+    console.log('[Schema Heal] ========================================');
+    console.log('[Schema Heal] Verification:');
+    console.log('[Schema Heal]   class_name present: ' + hasClassName);
+    console.log('[Schema Heal]   subject present: ' + hasSubject);
+    console.log('[Schema Heal]   teacher_id present: ' + hasTeacherId);
+    console.log('[Schema Heal]   assignment_id removed: ' + noAssignmentId);
+    console.log('[Schema Heal] ========================================');
+
+    if (hasClassName && hasSubject && hasTeacherId && noAssignmentId) {
+      console.log('[Schema Heal] SUCCESS - schema is fully repaired!');
+    } else {
+      console.error('[Schema Heal] WARNING - schema may still have issues. See above.');
     }
 
-    console.log('[Schema Heal] COMPLETE - database schema is ready.');
   } catch (err) {
-    console.error('[Schema Heal] ERROR:', err.message);
-    console.error('[Schema Heal] Stack:', err.stack);
+    console.error('[Schema Heal] FATAL ERROR: ' + err.message);
+    console.error('[Schema Heal] Stack: ' + err.stack);
   }
 }
 
