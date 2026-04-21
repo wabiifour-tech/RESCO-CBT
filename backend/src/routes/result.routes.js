@@ -163,6 +163,7 @@ router.get('/student', authenticate, requireRole('STUDENT'), async (req, res) =>
             subject: true,
             className: true,
             resultVisibility: true,
+            passMark: true,
           },
         },
       },
@@ -280,7 +281,7 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
       prisma.result.findMany({
         where,
         include: {
-          exam: { select: { title: true, type: true, subject: true, className: true } },
+          exam: { select: { title: true, type: true, subject: true, className: true, passMark: true } },
           student: { select: { admissionNo: true, firstName: true, lastName: true, className: true } },
         },
         orderBy: { submittedAt: 'desc' },
@@ -293,7 +294,7 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
     // Summary stats
     const allResults = await prisma.result.findMany({
       where,
-      select: { score: true, totalMarks: true, percentage: true },
+      select: { score: true, totalMarks: true, percentage: true, exam: { select: { passMark: true } } },
     });
 
     const avgScore = allResults.length > 0 ? allResults.reduce((s, r) => s + r.percentage, 0) / allResults.length : 0;

@@ -694,8 +694,9 @@ export default function TeacherDashboard() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {recentResults.map((r, idx) => {
-                const passed = r.passed;
+                const passMark = r.exam?.passMark || 50;
                 const pct = r.percentage || 0;
+                const passed = pct >= passMark;
 
                 return (
                   <div
@@ -808,7 +809,7 @@ export default function TeacherDashboard() {
                             <span className="text-gray-400">/{r.totalMarks}</span>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <span className={"inline-block px-3 py-1 rounded-full text-xs font-bold " + (r.percentage >= 50 ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200')}>
+                            <span className={"inline-block px-3 py-1 rounded-full text-xs font-bold " + ((r.percentage || 0) >= (r.exam?.passMark || 50) ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200')}>
                               {r.percentage}%
                             </span>
                           </td>

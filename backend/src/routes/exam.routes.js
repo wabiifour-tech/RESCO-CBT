@@ -238,7 +238,7 @@ router.get('/available', authenticate, requireRole('STUDENT'), async (req, res) 
           select: { id: true },
         },
       },
-      orderBy: { startDate: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     const examList = exams.map(exam => {

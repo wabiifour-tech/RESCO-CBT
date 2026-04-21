@@ -1280,7 +1280,7 @@ export default function StudentDashboard() {
                     </div>
                   );
                 }
-                var passed = r.percentage >= 50;
+                var passed = (r.percentage || 0) >= (r.exam && r.exam.passMark ? r.exam.passMark : 50);
                 return (
                   <div
                     key={r.id}
