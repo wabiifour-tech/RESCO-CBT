@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["...", "prisma-engines"]
+nixPkgs = ["...", "prisma-engines", "poppler"]
 
 [phases.install]
 cmds = ["npm install"]

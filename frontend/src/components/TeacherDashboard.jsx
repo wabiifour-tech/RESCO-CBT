@@ -85,15 +85,28 @@ export default function TeacherDashboard() {
   const handleCSVUpload = async (e) => {
     e.preventDefault();
     if (!uploadFile) { toast.error('Select a CSV file'); return; }
+    if (!uploadExamId) { toast.error('Select an exam first'); return; }
     try {
       const formData = new FormData();
       formData.append('file', uploadFile);
-      formData.append('examId', uploadExamId);
-      await api.post('/questions/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      toast.success('Questions uploaded!');
+      formData.append('examId', String(uploadExamId));
+      const res = await api.post('/questions/upload', formData, { timeout: 120000 });
+      const data = res.data;
+      if (data.success && data.data) {
+        toast.success(`${data.data.created}/${data.data.total} questions uploaded`);
+        if (data.data.errors && data.data.errors.length > 0) {
+          toast.error(`${data.data.errors.length} row(s) had errors`);
+        }
+      } else {
+        toast.success('Questions uploaded!');
+      }
       setShowUpload(false);
+      setUploadFile(null);
       fetchData();
-    } catch (err) { toast.error(err.response?.data?.message || 'Upload failed'); }
+    } catch (err) {
+      const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Upload failed. Check file format and try again.';
+      toast.error(errMsg);
+    }
   };
 
   const handleExport = async (examId, format = 'csv') => {

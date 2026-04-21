@@ -367,23 +367,32 @@ export default function AdminPanel() {
 
   const handleCSVUpload = async (e) => {
     e.preventDefault();
-    if (!uploadFile) { toast.error('Select a CSV file'); return; }
+    if (!uploadFile) { toast.error('Select a file first'); return; }
     if (!selectedExamId) { toast.error('Select an exam first'); return; }
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append('file', uploadFile);
-      formData.append('examId', selectedExamId);
+      formData.append('examId', String(selectedExamId));
       const res = await api.post('/admin/questions/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000,
       });
-      toast.success(`Uploaded ${res.data.data.created}/${res.data.data.total} questions`);
+      const data = res.data;
+      if (data.success && data.data) {
+        toast.success(`Uploaded ${data.data.created}/${data.data.total} questions`);
+        if (data.data.errors && data.data.errors.length > 0) {
+          toast.error(`${data.data.errors.length} row(s) skipped due to errors`);
+        }
+      } else {
+        toast.success('Questions uploaded');
+      }
       setShowUploadModal(false);
       setUploadFile(null);
       fetchExamQuestions(selectedExamId);
       fetchDraftExams();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Upload failed');
+      const errMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Upload failed. Check file format and try again.';
+      toast.error(errMsg);
     } finally {
       setUploading(false);
     }
@@ -1659,8 +1668,6 @@ export default function AdminPanel() {
       {/* Inject global keyframes */}
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes sidebarSlideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
-        @keyframes sidebarSlideOut { from { transform: translateX(0); } to { transform: translateX(-100%); } }
         @keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
         /* Responsive sidebar */
         @media (max-width: 1023px) {
@@ -1668,11 +1675,12 @@ export default function AdminPanel() {
             position: fixed !important;
             top: 0 !important; left: 0 !important; bottom: 0 !important;
             transform: translateX(-100%);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
           }
           .admin-sidebar.open {
-            transform: translateX(0);
-            animation: sidebarSlideIn 0.3s ease both;
+            transform: translateX(0) !important;
+            pointer-events: auto;
           }
           .admin-main-content {
             margin-left: 0 !important;
@@ -1687,6 +1695,7 @@ export default function AdminPanel() {
             top: 0 !important;
             left: 0 !important;
             bottom: 0 !important;
+            pointer-events: auto;
           }
           .admin-main-content {
             margin-left: 260px !important;

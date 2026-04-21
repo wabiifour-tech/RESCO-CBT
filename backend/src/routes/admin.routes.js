@@ -1414,12 +1414,23 @@ router.post('/questions/upload', upload.single('file'), async (req, res) => {
     }
     let created = [];
     if (validQuestions.length > 0) {
-      created = await prisma.$transaction(validQuestions.map(q => prisma.examQuestion.create({ data: q })));
+      // Batch creates in groups of 50 to avoid transaction timeouts
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < validQuestions.length; i += BATCH_SIZE) {
+        const batch = validQuestions.slice(i, i + BATCH_SIZE);
+        const batchCreated = await prisma.$transaction(
+          batch.map(q => prisma.examQuestion.create({ data: q }))
+        );
+        created = created.concat(batchCreated);
+      }
     }
     res.status(201).json({ success: true, data: { total: parsed.rows.length, created: created.length, errors } });
   } catch (error) {
     console.error('[Admin Upload Questions Error]', error);
-    res.status(500).json({ error: 'Failed to upload questions.' });
+    const msg = error.code?.startsWith('P')
+      ? 'Database error: ' + (error.meta?.target || error.message)
+      : error.message || 'Failed to upload questions.';
+    res.status(500).json({ error: msg });
   }
 });
 
