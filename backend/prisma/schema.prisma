@@ -59,7 +59,7 @@ model Exam {
   passMark         Int      @default(50)
   startDate        String   @default("")
   endDate          String   @default("")
-  resultVisibility String   @default("IMMEDIATE") @map("result_visibility")
+  resultVisibility String   @default("MANUAL") @map("result_visibility")
   shuffleQuestions Int      @default(0) @map("shuffle_questions")
   shuffleOptions   Int      @default(0) @map("shuffle_options")
   className        String   @default("JSS1") @map("class_name")

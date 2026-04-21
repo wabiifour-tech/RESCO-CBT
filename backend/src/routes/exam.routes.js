@@ -29,7 +29,7 @@ router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, asy
         passMark: parseInt(passMark, 10) || 25,
         startDate: String(startDate || ''),
         endDate: String(endDate || ''),
-        resultVisibility: resultVisibility || 'IMMEDIATE',
+        resultVisibility: resultVisibility || 'MANUAL',
         shuffleQuestions: shuffleQuestions === true ? 1 : 0,
         shuffleOptions: shuffleOptions === true ? 1 : 0,
         className: className.trim(),

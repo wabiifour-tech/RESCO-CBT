@@ -106,23 +106,27 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
     });
 
     // Build response based on visibility
+    const showScores = exam.resultVisibility === 'IMMEDIATE';
     const responseData = {
       success: true,
       result: {
         id: result.id,
-        score,
-        totalMarks,
-        percentage: Math.round(percentage * 100) / 100,
-        passed,
-        timeSpent: timeSpent || 0,
+        ...(showScores ? {
+          score,
+          totalMarks,
+          percentage: Math.round(percentage * 100) / 100,
+          passed,
+          timeSpent: timeSpent || 0,
+        } : {}),
         examStartTime: startTime,
         examEndTime: now,
         submittedAt: result.submittedAt,
+        showScores,
       },
     };
 
     // If IMMEDIATE visibility, include answer details
-    if (exam.resultVisibility === 'IMMEDIATE') {
+    if (showScores) {
       responseData.result.answers = resultAnswers.map((a, i) => {
         const question = questionMap[a.questionId];
         return {
@@ -158,13 +162,34 @@ router.get('/student', authenticate, requireRole('STUDENT'), async (req, res) =>
             duration: true,
             subject: true,
             className: true,
+            resultVisibility: true,
           },
         },
       },
       orderBy: { submittedAt: 'desc' },
     });
 
-    res.json({ success: true, results });
+    // Hide scores for non-IMMEDIATE visibility exams
+    const sanitized = results.map(r => {
+      const showScores = r.exam.resultVisibility === 'IMMEDIATE';
+      return {
+        id: r.id,
+        examId: r.examId,
+        submittedAt: r.submittedAt,
+        examStartTime: r.examStartTime,
+        examEndTime: r.examEndTime,
+        exam: r.exam,
+        showScores,
+        ...(showScores ? {
+          score: r.score,
+          totalMarks: r.totalMarks,
+          percentage: r.percentage,
+          timeSpent: r.timeSpent,
+        } : {}),
+      };
+    });
+
+    res.json({ success: true, results: sanitized });
   } catch (error) {
     console.error('Get student results error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch results.' });
@@ -188,10 +213,25 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
       return res.status(404).json({ success: false, message: 'Result not found.' });
     }
 
+    // MANUAL mode: hide all scores and answers from students
+    if (result.exam.resultVisibility === 'MANUAL') {
+      return res.status(200).json({
+        success: true,
+        result: {
+          id: result.id,
+          submittedAt: result.submittedAt,
+          examStartTime: result.examStartTime,
+          examEndTime: result.examEndTime,
+          showScores: false,
+          showDetails: false,
+        },
+      });
+    }
+
+    // AFTER_CLOSE mode: hide details if exam hasn't closed yet
     if (result.exam.resultVisibility === 'AFTER_CLOSE') {
       const endDate = result.exam.endDate;
       const hasEnd = endDate && !isNaN(new Date(endDate).getTime());
-      // If an end date exists and it hasn't passed yet, hide details
       if (hasEnd && new Date(endDate) > new Date()) {
         return res.status(200).json({
           success: true,
@@ -204,14 +244,14 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
             examStartTime: result.examStartTime,
             examEndTime: result.examEndTime,
             message: 'Detailed answers will be available after the exam closes.',
+            showScores: true,
             showDetails: false,
           },
         });
       }
-      // No end date set — show results immediately (exam never "closes")
     }
 
-    res.json({ success: true, result, showDetails: true });
+    res.json({ success: true, result, showScores: true, showDetails: true });
   } catch (error) {
     console.error('Get student exam result error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch result.' });

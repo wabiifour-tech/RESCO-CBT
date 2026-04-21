@@ -9,7 +9,7 @@ import {
   LogOut, BookOpen, Clock, Award, Star, Lightbulb,
   ChevronRight, ChevronLeft, CheckCircle, XCircle,
   Trophy, Target, Sparkles, Brain, Timer, RotateCcw, AlertTriangle, BookMarked, Monitor, ShieldCheck, Users,
-  Printer, KeyRound
+  Printer, KeyRound, ClipboardCheck
 } from 'lucide-react';
 
 const EXAM_TIPS = [
@@ -361,15 +361,56 @@ export default function StudentDashboard() {
   };
 
   // Quick stats
+  const visibleResults = results.filter(function (r) { return r.showScores !== false; });
   const totalAvailable = exams.filter(function (e) { return e.isOpen && !e.hasTaken; }).length;
-  const totalTaken = results.length;
-  const averageScore = totalTaken > 0 ? Math.round(results.reduce(function (sum, r) { return sum + (r.percentage || 0); }, 0) / totalTaken) : 0;
-  const bestScore = totalTaken > 0 ? Math.max.apply(null, results.map(function (r) { return r.percentage || 0; })) : 0;
+  const totalTaken = visibleResults.length;
+  const averageScore = totalTaken > 0 ? Math.round(visibleResults.reduce(function (sum, r) { return sum + (r.percentage || 0); }, 0) / totalTaken) : 0;
+  const bestScore = totalTaken > 0 ? Math.max.apply(null, visibleResults.map(function (r) { return r.percentage || 0; })) : 0;
 
   // ========================
   // VIEW 3: RESULT
   // ========================
   if (view === 'exam' && examResult) {
+    // If scores are hidden (MANUAL or AFTER_CLOSE mode), show simple confirmation
+    if (examResult.showScores === false) {
+      return (
+        <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+          <div className="resco-watermark">
+            <img src="/resco-logo.png" alt="" />
+          </div>
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="max-w-lg w-full">
+              <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+                <div className="p-10 text-center bg-gradient-to-r from-indigo-500 to-purple-600">
+                  <div className="inline-block mb-4 animate-bounce">
+                    <CheckCircle className="w-20 h-20 text-green-300 drop-shadow-lg" />
+                  </div>
+                  <h2 className="text-3xl font-extrabold text-white">Exam Submitted!</h2>
+                  <p className="text-white/80 mt-2 text-lg">{examDetail ? examDetail.title : ''}</p>
+                </div>
+                <div className="px-8 py-8">
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6 text-center mb-6">
+                    <ClipboardCheck className="w-12 h-12 text-indigo-400 mx-auto mb-3" />
+                    <p className="text-gray-700 font-medium text-lg">Your exam has been successfully submitted.</p>
+                    <p className="text-gray-500 text-sm mt-2">Your results will be available once released by your teacher.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={exitToDashboard}
+                      className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-4 rounded-2xl text-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg flex items-center justify-center gap-3"
+                    >
+                      <Sparkles className="w-5 h-5" />
+                      Back to Dashboard
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const passed = examResult.passed;
     const scorePercent = examResult.percentage || 0;
     const circumference = 2 * Math.PI * 80;
@@ -1214,6 +1255,31 @@ export default function StudentDashboard() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {results.slice(0, 6).map(function (r, idx) {
+                if (r.showScores === false) {
+                  return (
+                    <div
+                      key={r.id}
+                      className="card-enter bg-white rounded-2xl shadow-md border border-gray-100 p-4 hover:shadow-lg transition-all duration-300"
+                      style={{ animationDelay: (idx * 0.08) + 's' }}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-gray-800 text-sm truncate">{r.exam && r.exam.title}</h4>
+                          <p className="text-xs text-gray-400 mt-0.5">{r.exam ? (r.exam.subject || '') : ''}</p>
+                        </div>
+                        <div className="flex-shrink-0 ml-2 px-3 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-700">
+                          Submitted
+                        </div>
+                      </div>
+                      <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-center">
+                        <p className="text-xs text-indigo-600 font-medium">Result pending — awaiting teacher release.</p>
+                      </div>
+                      <p className="text-xs text-gray-300 mt-2">
+                        {r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : ''}
+                      </p>
+                    </div>
+                  );
+                }
                 var passed = r.percentage >= 50;
                 return (
                   <div
