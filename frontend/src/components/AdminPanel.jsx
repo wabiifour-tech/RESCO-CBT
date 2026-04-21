@@ -358,7 +358,9 @@ export default function AdminPanel() {
       fetchAllExams();
       fetchDraftExams();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to create exam');
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to create exam';
+      console.error('Admin create exam error:', err.response?.data || err.message);
+      toast.error(msg, { duration: 6000 });
     }
   };
 

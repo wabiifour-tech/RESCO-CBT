@@ -62,7 +62,11 @@ export default function TeacherDashboard() {
       setShowCreate(false);
       setCreateForm({ title: '', description: '', type: 'TEST', duration: 30, totalMarks: 50, passMark: 25, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE', subject: '', className: 'JSS1' });
       fetchData();
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed to create exam'); }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to create exam';
+      console.error('Create exam error:', err.response?.data || err.message);
+      toast.error(msg, { duration: 6000 });
+    }
   };
 
   const handlePublishExam = async (id) => {

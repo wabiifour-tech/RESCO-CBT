@@ -70,11 +70,11 @@ router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, asy
         title,
         description: description || null,
         type,
-        duration,
-        totalMarks,
-        passMark,
-        startDate: startDate,
-        endDate: endDate,
+        duration: parseInt(duration, 10) || 30,
+        totalMarks: parseInt(totalMarks, 10) || 50,
+        passMark: parseInt(passMark, 10) || 25,
+        startDate: String(startDate || ''),
+        endDate: String(endDate || ''),
         resultVisibility: resultVisibility || 'IMMEDIATE',
         shuffleQuestions: shuffleQuestions === false ? 0 : 1,
         shuffleOptions: shuffleOptions === false ? 0 : 1,
@@ -86,7 +86,10 @@ router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, asy
     res.status(201).json({ success: true, exam });
   } catch (error) {
     console.error('Create exam error:', error);
-    res.status(500).json({ success: false, message: 'Failed to create exam.' });
+    const msg = error.code?.startsWith('P')
+      ? 'Database error: ' + (error.meta?.target || error.message)
+      : error.message || 'Failed to create exam.';
+    res.status(500).json({ success: false, message: msg });
   }
 });
 

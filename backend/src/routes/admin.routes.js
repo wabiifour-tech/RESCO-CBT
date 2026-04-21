@@ -1266,7 +1266,7 @@ router.get('/exams', async (req, res) => {
 // ============================================================
 router.post('/exams/create', async (req, res) => {
   try {
-    const { assignmentId, subject, className, teacherId, title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility, shuffleQuestions, shuffleOptions } = req.body;
+    const { assignmentId, subject, className, teacherId, title, description, type, duration, totalMarks, passMark, startDate, endDate } = req.body;
 
     if (!title || !duration) {
       return res.status(400).json({ error: 'Missing required fields: title, duration' });
@@ -1347,9 +1347,7 @@ router.post('/exams/create', async (req, res) => {
         passMark: parseInt(passMark, 10) || 50,
         startDate: startDate || '',
         endDate: endDate || '',
-        resultVisibility: resultVisibility || 'IMMEDIATE',
-        shuffleQuestions: shuffleQuestions === false ? 0 : 1,
-        shuffleOptions: shuffleOptions === false ? 0 : 1,
+        resultVisibility: req.body.resultVisibility || 'IMMEDIATE',
       },
       include: {
         assignment: { include: { teacher: { select: { firstName: true, lastName: true } } } },
@@ -1368,7 +1366,10 @@ router.post('/exams/create', async (req, res) => {
     });
   } catch (error) {
     console.error('[Admin Create Exam Error]', error);
-    res.status(500).json({ error: 'Failed to create exam.' });
+    const msg = error.code?.startsWith('P')
+      ? 'Database error: ' + (error.meta?.target || error.message)
+      : error.message || 'Failed to create exam.';
+    res.status(500).json({ error: msg });
   }
 });
 
