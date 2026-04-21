@@ -76,8 +76,8 @@ router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, asy
         startDate: startDate,
         endDate: endDate,
         resultVisibility: resultVisibility || 'IMMEDIATE',
-        shuffleQuestions: shuffleQuestions !== false,
-        shuffleOptions: shuffleOptions !== false,
+        shuffleQuestions: shuffleQuestions === false ? 0 : 1,
+        shuffleOptions: shuffleOptions === false ? 0 : 1,
         assignmentId: finalAssignmentId,
       },
       include: { assignment: true },
@@ -177,8 +177,8 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
         ...(resultVisibility && { resultVisibility }),
-        ...(shuffleQuestions !== undefined && { shuffleQuestions }),
-        ...(shuffleOptions !== undefined && { shuffleOptions }),
+        ...(shuffleQuestions !== undefined && { shuffleQuestions: shuffleQuestions ? 1 : 0 }),
+        ...(shuffleOptions !== undefined && { shuffleOptions: shuffleOptions ? 1 : 0 }),
       },
     });
 
