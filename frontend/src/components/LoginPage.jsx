@@ -256,6 +256,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden" style={animStyles.gradientBg}>
 
+      {/* School Logo Watermark */}
+      <div className="resco-watermark">
+        <img src="/resco-logo.png" alt="" />
+      </div>
+
       {/* Background Decorative Blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-32 -right-32 w-[420px] h-[420px] bg-white/[0.06]" style={animStyles.floatBlob1} />

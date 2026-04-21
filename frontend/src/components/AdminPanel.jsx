@@ -8,7 +8,7 @@ import {
   LogOut, BookOpen, Users, UserCheck, UserX, UserPlus, BarChart3, Trash2,
   X, Eye, Shield, GraduationCap, TrendingUp, Clock, CheckCircle, XCircle,
   Search, Download, Settings, ChevronRight, Sparkles, School, Award,
-  Upload, FileQuestion, Plus, Minus
+  Upload, FileQuestion, Plus, Minus, Menu
 } from 'lucide-react';
 
 // ─── Color Maps (avoid template-literal classNames) ────────────────────────────
@@ -122,6 +122,9 @@ export default function AdminPanel() {
   // Form data
   const [teacherForm, setTeacherForm] = useState({ firstName: '', lastName: '', username: '', password: '' });
   const [studentForm, setStudentForm] = useState({ firstName: '', lastName: '', admissionNo: '', className: '', email: '', password: '' });
+
+  // Sidebar responsive state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ─── Fetch helpers ─────────────────────────────────────────────────────────
   const fetchDashboard = useCallback(async () => {
@@ -1779,22 +1782,71 @@ export default function AdminPanel() {
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9' }}>
       {/* Inject global keyframes */}
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes sidebarSlideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+        @keyframes sidebarSlideOut { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+        @keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
+        /* Responsive sidebar */
+        @media (max-width: 1023px) {
+          .admin-sidebar {
+            position: fixed !important;
+            top: 0 !important; left: 0 !important; bottom: 0 !important;
+            transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          .admin-sidebar.open {
+            transform: translateX(0);
+            animation: sidebarSlideIn 0.3s ease both;
+          }
+          .admin-main-content {
+            margin-left: 0 !important;
+          }
+          .admin-hamburger-btn {
+            display: flex !important;
+          }
+        }
+        @media (min-width: 1024px) {
+          .admin-sidebar {
+            position: sticky !important;
+            top: 0 !important;
+          }
+          .admin-hamburger-btn {
+            display: none !important;
+          }
+          .admin-sidebar-close-btn {
+            display: none !important;
+          }
+        }
+      ` }} />
+
+      {/* ─── MOBILE BACKDROP ──────────────────────────────────────────────── */}
+      {sidebarOpen && (
+        <div
+          className="admin-backdrop-overlay"
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)', zIndex: 99,
+            animation: 'fadeInOverlay 0.2s ease both',
+          }}
+        />
+      )}
 
       {/* ─── SIDEBAR ───────────────────────────────────────────────────────── */}
-      <aside style={{
-        width: 260,
-        minWidth: 260,
-        background: 'linear-gradient(180deg, #1e1b4b 0%, #312e81 40%, #3730a3 100%)',
-        color: '#fff',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '4px 0 24px rgba(0,0,0,0.12)',
-        position: 'sticky',
-        top: 0,
-        height: '100vh',
-        overflowY: 'auto',
-        zIndex: 100,
-      }}>
+      <aside
+        className={'admin-sidebar' + (sidebarOpen ? ' open' : '')}
+        style={{
+          width: 260,
+          minWidth: 260,
+          background: 'linear-gradient(180deg, #1e1b4b 0%, #312e81 40%, #3730a3 100%)',
+          color: '#fff',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '4px 0 24px rgba(0,0,0,0.12)',
+          height: '100vh',
+          overflowY: 'auto',
+          zIndex: 100,
+        }}>
         {/* Logo / Brand */}
         <div style={{
           padding: '24px 20px 20px',
@@ -1824,10 +1876,23 @@ export default function AdminPanel() {
               <School size={24} />
             </div>
           </div>
-          <div>
+          <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>RESCO CBT</h1>
             <p style={{ fontSize: 11, margin: '2px 0 0 0', opacity: 0.6, fontWeight: 500 }}>Admin Panel</p>
           </div>
+          {/* Mobile close button */}
+          <button
+            className="admin-sidebar-close-btn"
+            onClick={() => setSidebarOpen(false)}
+            style={{
+              display: 'none', alignItems: 'center', justifyContent: 'center',
+              width: 32, height: 32, borderRadius: 8,
+              background: 'rgba(255,255,255,0.1)', border: 'none',
+              color: '#fff', cursor: 'pointer',
+            }}
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -1838,7 +1903,7 @@ export default function AdminPanel() {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 16px',
@@ -1946,12 +2011,46 @@ export default function AdminPanel() {
       </aside>
 
       {/* ─── MAIN CONTENT ──────────────────────────────────────────────────── */}
-      <main style={{
-        flex: 1,
-        padding: 32,
-        overflowY: 'auto',
-        minWidth: 0,
-      }}>
+      <main
+        className="admin-main-content"
+        style={{
+          flex: 1,
+          padding: 32,
+          overflowY: 'auto',
+          minWidth: 0,
+          position: 'relative',
+        }}
+      >
+        {/* Hamburger menu button for mobile */}
+        <button
+          className="admin-hamburger-btn"
+          onClick={() => setSidebarOpen(true)}
+          style={{
+            display: 'none',
+            position: 'fixed',
+            top: 16,
+            left: 16,
+            zIndex: 50,
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: 'linear-gradient(135deg, #4338ca, #6366f1)',
+            color: '#fff',
+            border: 'none',
+            boxShadow: '0 4px 14px rgba(99,102,241,0.4)',
+            cursor: 'pointer',
+          }}
+        >
+          <Menu size={20} />
+        </button>
+
+        {/* Watermark */}
+        <div className="resco-watermark">
+          <img src="/resco-logo.png" alt="" />
+        </div>
+
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
           {renderTabContent()}
         </div>

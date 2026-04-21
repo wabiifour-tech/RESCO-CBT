@@ -384,6 +384,10 @@ export default function StudentDashboard() {
 
     return (
       <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+        {/* School Logo Watermark */}
+        <div className="resco-watermark">
+          <img src="/resco-logo.png" alt="" />
+        </div>
         {passed && <ConfettiEffect />}
         <style>{`
           @keyframes scoreRing {
@@ -567,6 +571,10 @@ export default function StudentDashboard() {
 
     return (
       <div className="min-h-screen bg-gray-50">
+        {/* School Logo Watermark */}
+        <div className="resco-watermark">
+          <img src="/resco-logo.png" alt="" />
+        </div>
         <style>{`
           @keyframes pulseTimer {
             0%, 100% { transform: scale(1); }
@@ -882,6 +890,10 @@ export default function StudentDashboard() {
   // ========================
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
+      {/* School Logo Watermark */}
+      <div className="resco-watermark">
+        <img src="/resco-logo.png" alt="" />
+      </div>
       <style>{`
         @keyframes fadeInUp {
           from { transform: translateY(20px); opacity: 0; }
