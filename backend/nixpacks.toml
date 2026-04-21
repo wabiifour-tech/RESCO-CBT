@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["...", "prisma-engines"]
+nixPkgs = ["...", "prisma-engines", "postgresql"]
 
 [phases.install]
 cmds = ["npm install"]
@@ -9,7 +9,7 @@ cmds = ["npx prisma generate"]
 
 [phases.start]
 cmds = [
-  "node prisma/migrate-assignments.js",
+  "npx prisma db execute --file ./prisma/migration.sql --schema ./prisma/schema.prisma",
   "npx prisma db push --skip-generate --accept-data-loss",
   "node prisma/seed.js || echo 'Seed failed, continuing with server start'",
   "node src/server.js"
