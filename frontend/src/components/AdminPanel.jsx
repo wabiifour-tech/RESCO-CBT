@@ -1673,13 +1673,13 @@ export default function AdminPanel() {
         .admin-sidebar {
           position: fixed !important;
           top: 0 !important; left: 0 !important; bottom: 0 !important;
-          transform: translateX(-100%);
-          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-          pointer-events: none;
+          transform: translateX(-100%) !important;
+          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          pointer-events: none !important;
         }
         .admin-sidebar.open {
           transform: translateX(0) !important;
-          pointer-events: auto;
+          pointer-events: auto !important;
         }
         .admin-main-content {
           margin-left: 0 !important;
@@ -1717,7 +1717,7 @@ export default function AdminPanel() {
           color: '#fff',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '4px 0 24px rgba(0,0,0,0.12)',
+          boxShadow: sidebarOpen ? '4px 0 24px rgba(0,0,0,0.12)' : 'none',
           height: '100vh',
           overflowY: 'auto',
           zIndex: 100,
@@ -1725,6 +1725,9 @@ export default function AdminPanel() {
           top: 0,
           left: 0,
           bottom: 0,
+          transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+          pointerEvents: sidebarOpen ? 'auto' : 'none',
         }}>
         {/* Logo / Brand */}
         <div style={{
