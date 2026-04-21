@@ -1018,7 +1018,7 @@ export default function StudentDashboard() {
           <details style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
             <summary style={{ padding: '14px 20px', cursor: 'pointer', fontSize: 16, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', background: 'linear-gradient(135deg, #fef3c7, #fde68a)' }}>
               <AlertTriangle size={20} style={{ color: '#d97706' }} />
-              Exam Instructions & Guidelines
+              Exam Instructions &amp; Guidelines
               <span style={{ marginLeft: 'auto', fontSize: 12, color: '#92400e', fontWeight: 600 }}>Click to expand</span>
             </summary>
             <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>

@@ -154,13 +154,13 @@ export default function TeacherDashboard() {
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
           {[
-            { icon: FileText, label: 'Total Exams', value: stats.total, color: 'blue' },
-            { icon: Eye, label: 'Published', value: stats.published, color: 'green' },
-            { icon: Edit3, label: 'Drafts', value: stats.draft, color: 'yellow' },
-            { icon: Users, label: 'Assignments', value: assignments.length, color: 'purple' },
-          ].map(({ icon: Icon, label, value, color }) => (
+            { icon: FileText, label: 'Total Exams', value: stats.total, bgClass: 'bg-blue-100', textClass: 'text-blue-600' },
+            { icon: Eye, label: 'Published', value: stats.published, bgClass: 'bg-green-100', textClass: 'text-green-600' },
+            { icon: Edit3, label: 'Drafts', value: stats.draft, bgClass: 'bg-yellow-100', textClass: 'text-yellow-600' },
+            { icon: Users, label: 'Assignments', value: assignments.length, bgClass: 'bg-purple-100', textClass: 'text-purple-600' },
+          ].map(({ icon: Icon, label, value, bgClass, textClass }) => (
             <div key={label} className="card flex items-center gap-4">
-              <div className={`w-12 h-12 bg-${color}-100 rounded-xl flex items-center justify-center`}><Icon className={`w-6 h-6 text-${color}-600`} /></div>
+              <div className={`w-12 h-12 ${bgClass} rounded-xl flex items-center justify-center`}><Icon className={`w-6 h-6 ${textClass}`} /></div>
               <div><p className="text-2xl font-bold">{value}</p><p className="text-sm text-gray-500">{label}</p></div>
             </div>
           ))}
