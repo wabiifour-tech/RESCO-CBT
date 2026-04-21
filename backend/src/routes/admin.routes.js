@@ -356,7 +356,7 @@ router.delete('/teachers/:id', async (req, res) => {
     const teacher = await prisma.teacher.findUnique({
       where: { id },
       include: {
-        _count: { select: { exams: true, results: true } },
+        _count: { select: { exams: true } },
       },
     });
 
@@ -438,7 +438,7 @@ router.get('/students', async (req, res) => {
         lastName: s.lastName,
         className: s.className,
         email: s.user.email,
-        createdAt: s.createdAt,
+        createdAt: s.user.createdAt,
         resultCount: s._count.results,
       })),
       pagination: {
@@ -531,7 +531,7 @@ router.post('/students/create', async (req, res) => {
       firstName: student.firstName,
       lastName: student.lastName,
       className: student.className,
-      createdAt: student.createdAt,
+      createdAt: student.user.createdAt,
       message: 'Student created successfully',
     });
   } catch (error) {
@@ -1231,7 +1231,7 @@ router.get('/questions/:examId', async (req, res) => {
     if (!exam) return res.status(404).json({ error: 'Exam not found' });
     const questions = await prisma.examQuestion.findMany({
       where: { examId: req.params.examId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { id: 'asc' },
     });
     res.json({
       exam: { id: exam.id, title: exam.title, status: exam.status, subject: exam.subject, className: exam.className },

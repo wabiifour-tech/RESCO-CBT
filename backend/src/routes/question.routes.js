@@ -380,7 +380,7 @@ router.get('/:examId', authenticate, requireRole('TEACHER'), async (req, res) =>
     // --- Fetch all questions for this exam ---
     const questions = await prisma.examQuestion.findMany({
       where: { examId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { id: 'asc' },
       select: {
         id: true,
         question: true,
@@ -390,7 +390,6 @@ router.get('/:examId', authenticate, requireRole('TEACHER'), async (req, res) =>
         optionD: true,
         answer: true,
         marks: true,
-        createdAt: true,
       },
     });
 
