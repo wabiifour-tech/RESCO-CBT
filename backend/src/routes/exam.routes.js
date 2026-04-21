@@ -245,18 +245,23 @@ router.get('/available', authenticate, requireRole('STUDENT'), async (req, res) 
       const hasTaken = exam.results.length > 0;
       // Determine if exam is currently open based on schedule
       let isOpen = false;
-      const hasStart = exam.startDate && !isNaN(new Date(exam.startDate).getTime());
-      const hasEnd = exam.endDate && !isNaN(new Date(exam.endDate).getTime());
+      const startVal = exam.startDate || '';
+      const endVal = exam.endDate || '';
+      const hasStart = startVal !== '' && !isNaN(new Date(startVal).getTime());
+      const hasEnd = endVal !== '' && !isNaN(new Date(endVal).getTime());
 
       if (!hasStart && !hasEnd) {
         isOpen = true; // No schedule at all — always open
       } else if (hasStart && hasEnd) {
-        isOpen = new Date(exam.startDate) <= now && new Date(exam.endDate) >= now;
+        isOpen = new Date(startVal) <= now && new Date(endVal) >= now;
       } else if (hasStart && !hasEnd) {
-        isOpen = new Date(exam.startDate) <= now; // Only start set — opens at start, no deadline
+        isOpen = new Date(startVal) <= now; // Only start set — opens at start, no deadline
       } else if (!hasStart && hasEnd) {
-        isOpen = new Date(exam.endDate) >= now; // Only end set — open now, closes at end
+        isOpen = new Date(endVal) >= now; // Only end set — open now, closes at end
       }
+
+      console.log(`[Exam Availability] "${exam.title}" | start="${startVal}" end="${endVal}" | hasStart=${hasStart} hasEnd=${hasEnd} isOpen=${isOpen} | class=${exam.className} student=${student.className}`);
+
       const { results, ...examData } = exam;
       return { ...examData, hasTaken, isOpen };
     });
