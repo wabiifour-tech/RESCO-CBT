@@ -1682,12 +1682,12 @@ export default function AdminPanel() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Start Date *</label>
-                    <input type="datetime-local" required value={examForm.startDate} onChange={(e) => setExamForm({ ...examForm, startDate: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Start Date (optional)</label>
+                    <input type="datetime-local" value={examForm.startDate} onChange={(e) => setExamForm({ ...examForm, startDate: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>End Date *</label>
-                    <input type="datetime-local" required value={examForm.endDate} onChange={(e) => setExamForm({ ...examForm, endDate: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>End Date (optional)</label>
+                    <input type="datetime-local" value={examForm.endDate} onChange={(e) => setExamForm({ ...examForm, endDate: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} />
                   </div>
                 </div>
                 <div>
@@ -1726,15 +1726,6 @@ export default function AdminPanel() {
                   </label>
                   <input type="datetime-local" value={datesForm.endDate} onChange={(e) => setDatesForm({ ...datesForm, endDate: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }} placeholder="Leave empty for no deadline" />
                   <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Leave empty if there is no deadline for this exam</p>
-                </div>
-                <div style={{ padding: '10px 14px', borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-                  <p style={{ fontSize: 12, color: '#1e40af', fontWeight: 600, margin: '0 0 4px 0' }}>How scheduling works:</p>
-                  <ul style={{ fontSize: 12, color: '#3b82f6', margin: 0, paddingLeft: 16, lineHeight: 1.6 }}>
-                    <li><strong>Both set:</strong> Exam opens at start time and closes at end time</li>
-                    <li><strong>Both empty:</strong> Exam is always open to students</li>
-                    <li><strong>Only start set:</strong> Exam opens at start time, no deadline</li>
-                    <li><strong>Only end set:</strong> Exam is open now, closes at end time</li>
-                  </ul>
                 </div>
                 <button type="submit" style={{ width: '100%', padding: '13px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)', transition: 'all 0.2s ease' }}>Save Schedule</button>
               </form>
