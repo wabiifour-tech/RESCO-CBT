@@ -57,11 +57,16 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
     let score = 0;
     const resultAnswers = answers.map(a => {
       const question = questionMap[a.questionId];
-      const isCorrect = question ? (a.selected && a.selected.toUpperCase() === question.answer) : false;
+      const selectedUpper = a.selected ? a.selected.toUpperCase().trim() : null;
+      const correctAnswer = question ? question.answer.toUpperCase().trim() : null;
+      const isCorrect = question ? (selectedUpper === correctAnswer) : false;
+
+      console.log(`[GRADING] qId=${a.questionId} selected="${a.selected}" → "${selectedUpper}" vs answer="${correctAnswer}" → ${isCorrect ? 'CORRECT' : 'WRONG'}`);
+
       if (isCorrect) score += question.marks;
       return {
         questionId: a.questionId,
-        selected: a.selected ? a.selected.toUpperCase() : null,
+        selected: selectedUpper,
         correct: isCorrect ? 1 : 0,
       };
     });
