@@ -209,7 +209,7 @@ export default function StudentDashboard() {
         if (t <= 1) {
           clearInterval(timerRef.current);
           timerRef.current = null;
-          handleSubmit(true, true);
+          doSubmitExam();
           return 0;
         }
         return t - 1;
@@ -251,7 +251,8 @@ export default function StudentDashboard() {
       setAnswers({});
       setCurrentQuestion(0);
       setTimeLeft(exam.duration * 60);
-      startTimeRef.current = examStartTime ? new Date(examStartTime).getTime() : Date.now();
+      startTimeRef.current = Date.now();
+      if (examStartTime) startTimeRef.current = new Date(examStartTime).getTime();
       setExamResult(null);
       setView('exam');
     } catch (err) {
@@ -259,12 +260,8 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleSubmit = async function (shouldSubmit, isAutoSubmit) {
+  const doSubmitExam = async function () {
     if (submitting) return;
-    if (!shouldSubmit) {
-      setShowSubmitModal(true);
-      return;
-    }
     setShowSubmitModal(false);
     setSubmitting(true);
 
@@ -283,11 +280,7 @@ export default function StudentDashboard() {
         examStartTime: startTimeRef.current ? new Date(startTimeRef.current).toISOString() : null,
       });
       setExamResult(res.data.result);
-      if (isAutoSubmit) {
-        toast.success("Time's up! Exam submitted automatically.");
-      } else {
-        toast.success(res.data.result.passed ? 'Congratulations! You passed!' : 'Exam submitted. Keep practicing!');
-      }
+      toast.success(res.data.result.passed ? 'Congratulations! You passed!' : 'Exam submitted. Keep practicing!');
       fetchResults();
       fetchExams();
     } catch (err) {
@@ -298,7 +291,7 @@ export default function StudentDashboard() {
   };
 
   const confirmSubmit = function () {
-    handleSubmit(true, false);
+    doSubmitExam();
   };
 
   const exitToDashboard = function () {
@@ -424,7 +417,7 @@ export default function StudentDashboard() {
                     : <RotateCcw className="w-20 h-20 text-white drop-shadow-lg" />
                   }
                 </div>
-                <h2 className={'text-3xl font-extrabold text-white'}>
+                <h2 className={'text-3xl font-extrabold ' + (passed ? 'text-white' : 'text-white')}>
                   {passed ? '🎉 Amazing Job!' : '💪 Keep Going!'}
                 </h2>
                 <p className="text-white/80 mt-2 text-lg">{examDetail ? examDetail.title : ''}</p>
@@ -694,7 +687,7 @@ export default function StudentDashboard() {
                   <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
                     <div
                       className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: (questions.length > 0 ? (answeredCount / questions.length * 100) : 0) + '%' }}
+                      style={{ width: (answeredCount / questions.length * 100) + '%' }}
                     />
                   </div>
                 </div>
