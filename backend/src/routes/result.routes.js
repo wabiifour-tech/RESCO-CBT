@@ -24,7 +24,7 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
     // Verify exam is published and accessible
     const exam = await prisma.exam.findUnique({
       where: { id: examId },
-      select: { id: true, title: true, status: true, subject: true, className: true, resultVisibility: true, endDate: true },
+      select: { id: true, title: true, status: true, subject: true, className: true, resultVisibility: true, endDate: true, passMark: true },
     });
 
     if (!exam) {
@@ -57,9 +57,10 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
     let score = 0;
     const resultAnswers = answers.map(a => {
       const question = questionMap[a.questionId];
-      const selectedUpper = a.selected ? a.selected.toUpperCase().trim() : null;
-      const correctAnswer = question ? question.answer.toUpperCase().trim() : null;
-      const isCorrect = question ? (selectedUpper === correctAnswer) : false;
+      // Defensive: ensure we only compare single letters (A/B/C/D)
+      const selectedUpper = a.selected ? String(a.selected).toUpperCase().trim().charAt(0) : null;
+      const correctAnswer = question ? String(question.answer).toUpperCase().trim().charAt(0) : null;
+      const isCorrect = question && selectedUpper && correctAnswer ? (selectedUpper === correctAnswer) : false;
 
       console.log(`[GRADING] qId=${a.questionId} selected="${a.selected}" → "${selectedUpper}" vs answer="${correctAnswer}" → ${isCorrect ? 'CORRECT' : 'WRONG'}`);
 

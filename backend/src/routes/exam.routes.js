@@ -15,7 +15,7 @@ router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, asy
   try {
     const { title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility, shuffleQuestions, shuffleOptions, subject, className } = req.body;
 
-    if (!title || !type || !duration || !totalMarks || !passMark || !startDate || !endDate || !subject || !className) {
+    if (!title || !type || !duration || !totalMarks || !passMark || !subject || !className) {
       return res.status(400).json({ success: false, message: 'Missing required fields.' });
     }
 
@@ -30,8 +30,8 @@ router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, asy
         startDate: String(startDate || ''),
         endDate: String(endDate || ''),
         resultVisibility: resultVisibility || 'IMMEDIATE',
-        shuffleQuestions: shuffleQuestions === false ? 0 : 1,
-        shuffleOptions: shuffleOptions === false ? 0 : 1,
+        shuffleQuestions: shuffleQuestions === true ? 1 : 0,
+        shuffleOptions: shuffleOptions === true ? 1 : 0,
         className: className.trim(),
         subject: subject.trim(),
         teacherId: req.user.userId,
@@ -317,35 +317,18 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
       questions = shuffleArray(questions);
     }
 
-    // Format questions with options array and proper shuffle with remapping
+    // Format questions with options array (no option shuffling to ensure reliable grading)
     const formattedQuestions = questions.map(q => {
-      const options = [
-        { originalKey: 'A', text: q.optionA },
-        { originalKey: 'B', text: q.optionB },
-        { originalKey: 'C', text: q.optionC },
-        { originalKey: 'D', text: q.optionD },
-      ];
-
-      // Shuffle options if enabled
-      let shuffled = options;
-      if (exam.shuffleOptions) {
-        shuffled = [...options].sort(function () { return Math.random() - 0.5; });
-      }
-
-      // Re-label as A, B, C, D in shuffled order
-      const keyMap = {};
-      const relabeled = shuffled.map(function (opt, idx) {
-        const newKey = String.fromCharCode(65 + idx);
-        keyMap[newKey] = opt.originalKey;
-        return { key: newKey, text: opt.text };
-      });
-
       return {
         id: q.id,
         question: q.question,
-        options: relabeled,
+        options: [
+          { key: 'A', text: q.optionA },
+          { key: 'B', text: q.optionB },
+          { key: 'C', text: q.optionC },
+          { key: 'D', text: q.optionD },
+        ],
         marks: q.marks,
-        keyMap: keyMap,
       };
     });
 

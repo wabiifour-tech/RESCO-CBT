@@ -1542,4 +1542,20 @@ router.delete('/questions/:questionId', async (req, res) => {
   }
 });
 
+// ============================================================
+// 20. POST /fix-shuffle — Disable option shuffling on existing exams
+// ============================================================
+router.post('/fix-shuffle', async (req, res) => {
+  try {
+    const result = await prisma.exam.updateMany({
+      where: { shuffleOptions: 1 },
+      data: { shuffleOptions: 0 },
+    });
+    res.json({ success: true, message: `Updated ${result.count} exam(s) to disable option shuffling.` });
+  } catch (error) {
+    console.error('[Fix Shuffle Error]', error);
+    res.status(500).json({ error: 'Failed to update exams.' });
+  }
+});
+
 module.exports = router;

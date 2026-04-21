@@ -60,8 +60,8 @@ model Exam {
   startDate        String   @default("")
   endDate          String   @default("")
   resultVisibility String   @default("IMMEDIATE") @map("result_visibility")
-  shuffleQuestions Int      @default(1) @map("shuffle_questions")
-  shuffleOptions   Int      @default(1) @map("shuffle_options")
+  shuffleQuestions Int      @default(0) @map("shuffle_questions")
+  shuffleOptions   Int      @default(0) @map("shuffle_options")
   className        String   @default("JSS1") @map("class_name")
   subject          String
   createdAt        DateTime @default(now()) @map("created_at")

@@ -157,6 +157,9 @@ export default function StudentDashboard() {
 
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
+  const answersRef = useRef({});
+  const questionsRef = useRef([]);
+  const examDetailRef = useRef(null);
 
   const studentName = (user && user.student && (user.student.firstName || user.student.lastName))
     ? (user.student.firstName + ' ' + (user.student.lastName || '')).trim()
@@ -239,16 +242,13 @@ export default function StudentDashboard() {
       const qs = res.data.questions;
       const examStartTime = res.data.examStartTime;
 
-      // Store keyMap for answer remapping (server handles shuffling now)
-      const maps = {};
-      qs.forEach(function (q) {
-        if (q.keyMap) maps[q.id] = q.keyMap;
-      });
-
       setExamDetail(exam);
+      examDetailRef.current = exam;
       setQuestions(qs);
-      setKeyMaps(maps);
+      questionsRef.current = qs;
+      setKeyMaps({});
       setAnswers({});
+      answersRef.current = {};
       setCurrentQuestion(0);
       setTimeLeft(exam.duration * 60);
       startTimeRef.current = Date.now();
@@ -267,14 +267,14 @@ export default function StudentDashboard() {
 
     try {
       const elapsed = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0;
-      const formattedAnswers = questions.map(function (q) {
-        var studentSelected = answers[q.id]; // e.g., 'B' (shuffled key)
-        var km = keyMaps[q.id]; // e.g., { A: 'C', B: 'A', C: 'D', D: 'B' }
-        var originalKey = km && studentSelected ? km[studentSelected] : studentSelected;
-        return { questionId: q.id, selected: originalKey || null };
+      // Use refs to always get the latest values (prevents stale closure in timer auto-submit)
+      const currentQuestions = questionsRef.current;
+      const currentAnswers = answersRef.current;
+      const formattedAnswers = currentQuestions.map(function (q) {
+        return { questionId: q.id, selected: currentAnswers[q.id] || null };
       });
       const res = await api.post('/results/submit', {
-        examId: examDetail.id,
+        examId: examDetailRef.current ? examDetailRef.current.id : null,
         answers: formattedAnswers,
         timeSpent: elapsed,
         examStartTime: startTimeRef.current ? new Date(startTimeRef.current).toISOString() : null,
@@ -313,6 +313,7 @@ export default function StudentDashboard() {
     setAnswers(function (prev) {
       const next = { ...prev };
       next[questionId] = optionKey;
+      answersRef.current = next;
       return next;
     });
   };
