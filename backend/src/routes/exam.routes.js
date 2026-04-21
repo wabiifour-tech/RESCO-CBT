@@ -243,7 +243,19 @@ router.get('/available', authenticate, requireRole('STUDENT'), async (req, res) 
 
     const examList = exams.map(exam => {
       const hasTaken = exam.results.length > 0;
-      const isOpen = new Date(exam.startDate) <= now && new Date(exam.endDate) >= now;
+      // If no dates are set, treat as always open
+      let isOpen = false;
+      if (!exam.startDate || !exam.endDate) {
+        isOpen = true;
+      } else {
+        const start = new Date(exam.startDate);
+        const end = new Date(exam.endDate);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+          isOpen = start <= now && end >= now;
+        } else {
+          isOpen = true; // invalid dates treated as open
+        }
+      }
       const { results, ...examData } = exam;
       return { ...examData, hasTaken, isOpen };
     });
@@ -288,8 +300,15 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
       return res.status(400).json({ success: false, message: 'This exam is not available.' });
     }
 
-    if (new Date(exam.startDate) > now || new Date(exam.endDate) < now) {
-      return res.status(400).json({ success: false, message: 'This exam is not currently open.' });
+    // Check date constraints — if no dates set or invalid, allow access
+    if (exam.startDate && exam.endDate) {
+      const start = new Date(exam.startDate);
+      const end = new Date(exam.endDate);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        if (start > now || end < now) {
+          return res.status(400).json({ success: false, message: 'This exam is not currently open.' });
+        }
+      }
     }
 
     // Check student hasn't already taken it
