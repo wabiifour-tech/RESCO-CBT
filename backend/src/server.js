@@ -236,7 +236,7 @@ const server = app.listen(PORT, async () => {
       const principalEmail = process.env.PRINCIPAL_EMAIL || 'principal@resco';
       const existingPrincipal = await prisma.user.findUnique({ where: { email: principalEmail } });
       if (!existingPrincipal) {
-        const principalPass = process.env.PRINCIPAL_PASSWORD || 'principal123';
+        const principalPass = process.env.PRINCIPAL_PASSWORD || 'affordables';
         const hashedPw = await bcrypt.hash(principalPass, 12);
         await prisma.user.create({
           data: {
