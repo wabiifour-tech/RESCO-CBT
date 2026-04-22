@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const { execSync } = require('child_process');
 
 const { healSchema } = require('./migrate');
 const prisma = require('./config/database');
@@ -195,8 +196,36 @@ async function connectWithRetry(maxRetries = 20, baseDelayMs = 2000) {
 const server = app.listen(PORT, async () => {
   try {
     await connectWithRetry();
+
+    // ── CRITICAL: Ensure database tables exist before serving requests ──
+    // This runs prisma db push to create/align tables from schema.prisma
+    if (process.env.DATABASE_URL) {
+      try {
+        console.log('[DB Setup] Running prisma db push to ensure tables exist...');
+        const pushOutput = execSync('npx prisma db push --accept-data-loss 2>&1', {
+          cwd: process.cwd(),
+          timeout: 60000,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        console.log('[DB Setup] prisma db push completed successfully.');
+        if (pushOutput) console.log(pushOutput.trim());
+      } catch (pushErr) {
+        // prisma db push exits with code 1 if there are no changes — that's OK
+        const stderr = pushErr.stderr || pushErr.stdout || pushErr.message || '';
+        if (stderr.includes('Your database is now in sync') || stderr.includes('Already in sync') || stderr.includes('The database is already in sync')) {
+          console.log('[DB Setup] Database already in sync.');
+        } else {
+          console.error('[DB Setup] prisma db push output:', (pushErr.stdout || '').trim());
+          console.error('[DB Setup] prisma db push stderr:', (pushErr.stderr || '').trim());
+          console.warn('[DB Setup] Continuing with healSchema as fallback...');
+        }
+      }
+    } else {
+      console.warn('[DB Setup] DATABASE_URL not set — skipping prisma db push.');
+    }
+
     // ── CRITICAL: Heal database schema BEFORE serving any requests ──
-    // This adds missing columns (class_name, subject, teacher_id) to exams table
     await healSchema(prisma);
     console.log(`🚀 RESCO CBT Server running on port ${PORT} [${process.env.NODE_ENV || 'development'} mode]`);
     console.log(`   Health check: http://localhost:${PORT}/api/health`);
