@@ -573,6 +573,16 @@ router.post('/students/bulk', async (req, res) => {
       const s = students[i];
       const row = i + 1;
 
+      // Type guard: ensure required fields are strings
+      if (typeof s !== 'object' || s === null) {
+        errors.push({ row, admissionNo: 'N/A', error: `Row ${row}: Invalid record format.` });
+        continue;
+      }
+      if (typeof s.email !== 'string' || typeof s.password !== 'string' || typeof s.firstName !== 'string' || typeof s.lastName !== 'string' || typeof s.className !== 'string' || typeof s.admissionNo !== 'string') {
+        errors.push({ row, admissionNo: String(s.admissionNo || 'N/A'), error: `Row ${row}: All fields must be strings.` });
+        continue;
+      }
+
       if (!s.email || !s.password || !s.firstName || !s.lastName || !s.className || !s.admissionNo) {
         errors.push({
           row,

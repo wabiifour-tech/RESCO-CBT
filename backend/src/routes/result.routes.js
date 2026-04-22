@@ -85,7 +85,8 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
     const percentage = totalMarks > 0 ? (score / totalMarks) * 100 : 0;
     const passed = percentage >= exam.passMark;
 
-    const startTime = examStartTime ? new Date(examStartTime) : now;
+    const startTimeRaw = examStartTime ? new Date(examStartTime) : now;
+    const startTime = (startTimeRaw instanceof Date && !isNaN(startTimeRaw.getTime())) ? startTimeRaw : now;
 
     // Create result and answers in transaction
     const result = await prisma.$transaction(async (tx) => {
@@ -96,7 +97,7 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
           score,
           totalMarks,
           percentage: Math.round(percentage * 100) / 100,
-          timeSpent: timeSpent || 0,
+          timeSpent: typeof timeSpent === 'number' && timeSpent >= 0 ? timeSpent : 0,
           examStartTime: startTime,
           examEndTime: now,
         },
@@ -125,7 +126,7 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
           totalMarks,
           percentage: Math.round(percentage * 100) / 100,
           passed,
-          timeSpent: timeSpent || 0,
+          timeSpent: typeof timeSpent === 'number' && timeSpent >= 0 ? timeSpent : 0,
         } : {}),
         examStartTime: startTime,
         examEndTime: now,
