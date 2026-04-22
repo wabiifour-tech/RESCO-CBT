@@ -5,7 +5,7 @@ nixPkgs = ["...", "prisma-engines", "poppler"]
 cmds = ["npm install"]
 
 [phases.build]
-cmds = ["npx prisma generate", "npx prisma db push --accept-data-loss 2>&1"]
+cmds = ["npx prisma generate"]
 
 [phases.start]
 cmds = [
