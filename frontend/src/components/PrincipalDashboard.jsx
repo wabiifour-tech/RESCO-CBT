@@ -51,6 +51,7 @@ const KEYFRAMES = `
 @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.4); opacity: 0; } }
 @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 @keyframes countUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
 `;
 
 // ─── Shared Styles ────────────────────────────────────────────────────────────
@@ -186,6 +187,7 @@ export default function PrincipalDashboard() {
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [qSaving, setQSaving] = useState(false);
   const [questionsReadOnly, setQuestionsReadOnly] = useState(false);
+  const [questionsError, setQuestionsError] = useState(null);
 
   // Principal name
   const principalName = user?.firstName && user?.lastName
@@ -388,10 +390,12 @@ export default function PrincipalDashboard() {
         console.warn('[fetchQuestions] Unexpected response:', res.data);
         setQuestionsList([]);
       }
+      setQuestionsError(null);
     } catch (err) {
       console.error('[fetchQuestions] Error:', err.response?.status, err.response?.data);
       toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to load questions');
       setQuestionsList([]);
+      setQuestionsError(err.response?.data?.message || err.message || 'Failed to load questions');
     } finally { setQuestionsLoading(false); }
   };
 
@@ -1291,7 +1295,7 @@ export default function PrincipalDashboard() {
 
       {/* ─── Questions Modal ─── */}
       {showQuestionsModal && (
-        <div style={modalOverlay} onClick={(ev) => { if (ev.target === ev.currentTarget) setShowQuestionsModal(false); }}>
+        <div key={questionsExamId || 'questions-modal'} style={modalOverlay} onClick={(ev) => { if (ev.target === ev.currentTarget) setShowQuestionsModal(false); }}>
           <div style={modalCardWide}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1381,6 +1385,14 @@ export default function PrincipalDashboard() {
               </div>
             )}
 
+            {/* Error display */}
+            {questionsError && (
+              <div style={{ padding: 20, textAlign: 'center', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 12, background: '#fef2f2', marginBottom: 16 }}>
+                <p style={{ fontWeight: 600 }}>{questionsError}</p>
+                <button onClick={() => { setQuestionsError(null); fetchQuestions(questionsExamId); }} style={{ marginTop: 8, padding: '6px 16px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: 13 }}>Retry</button>
+              </div>
+            )}
+
             {/* Existing Questions List */}
             <div>
               <p style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 10 }}>
@@ -1405,22 +1417,22 @@ export default function PrincipalDashboard() {
                           <p style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 3 }}>Q{qIdx + 1}.</p>
                           <p style={{ fontSize: 13, color: '#1e293b', fontWeight: 500, margin: 0, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{q.question || ''}</p>
                           <div style={{ display: 'flex', gap: 12, fontSize: 12, color: '#64748b', flexWrap: 'wrap' }}>
-                            <span>A: {q.optionA}</span>
-                            <span>B: {q.optionB}</span>
-                            <span>C: {q.optionC}</span>
-                            <span>D: {q.optionD}</span>
+                            <span>A: {q.optionA || ''}</span>
+                            <span>B: {q.optionB || ''}</span>
+                            <span>C: {q.optionC || ''}</span>
+                            <span>D: {q.optionD || ''}</span>
                           </div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           <span style={{ padding: '2px 8px', borderRadius: 6, background: '#dcfce7', color: '#166534', fontSize: 11, fontWeight: 700 }}>
-                            Ans: {q.answer}
+                            Ans: {q.answer || '?'}
                           </span>
                           <span style={{ fontSize: 11, color: '#64748b' }}>{q.marks || 1} mark(s)</span>
                         </div>
                       </div>
                       {!questionsReadOnly && (
                         <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
-                          <button onClick={() => { setEditingQuestion(q); setQForm({ question: q.question || '', optionA: q.optionA || '', optionB: q.optionB || '', optionC: q.optionC || '', optionD: q.optionD || '', answer: q.answer || 'A', marks: q.marks || 1 }); }} style={{ ...secondaryBtn, padding: '4px 10px', fontSize: 11 }}>
+                          <button onClick={() => { const safe = q || {}; setEditingQuestion(safe); setQForm({ question: safe.question || '', optionA: safe.optionA || '', optionB: safe.optionB || '', optionC: safe.optionC || '', optionD: safe.optionD || '', answer: safe.answer || 'A', marks: safe.marks || 1 }); }} style={{ ...secondaryBtn, padding: '4px 10px', fontSize: 11 }}>
                             <Edit3 size={12} /> Edit
                           </button>
                           <button onClick={() => handleDeleteQuestion(q.id)} style={{ ...dangerBtn, padding: '4px 10px', fontSize: 11 }}>
