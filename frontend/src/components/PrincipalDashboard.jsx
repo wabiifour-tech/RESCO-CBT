@@ -11,7 +11,7 @@ import {
   Search, Download, Crown, GraduationCap, Sparkles, School, Award,
   FileText, ClipboardList, Target, ChevronRight, Menu, Lock,
   ArrowUpCircle, ArrowDownCircle, PieChart, Activity, Star, Hash,
-  Plus, Upload, Edit3, Trash2, Send, Archive, FileSpreadsheet
+  Plus, Upload, Edit3, Trash2, Send, Archive, FileSpreadsheet, UserPlus
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -188,6 +188,16 @@ export default function PrincipalDashboard() {
   const [qSaving, setQSaving] = useState(false);
   const [questionsReadOnly, setQuestionsReadOnly] = useState(false);
   const [questionsError, setQuestionsError] = useState(null);
+
+  // Teacher creation
+  const [showTeacherModal, setShowTeacherModal] = useState(false);
+  const [teacherSaving, setTeacherSaving] = useState(false);
+  const [teacherForm, setTeacherForm] = useState({ firstName: '', lastName: '', username: '', password: '' });
+
+  // Student creation
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [studentSaving, setStudentSaving] = useState(false);
+  const [studentForm, setStudentForm] = useState({ firstName: '', lastName: '', email: '', password: '', className: 'JSS1', admissionNo: '' });
 
   // Principal name
   const principalName = user?.firstName && user?.lastName
@@ -494,6 +504,66 @@ export default function PrincipalDashboard() {
     });
   };
 
+  // ─── Teacher CRUD Handlers ──────────────────────────────────────────────
+  const handleCreateTeacher = async (e) => {
+    e.preventDefault();
+    if (!teacherForm.firstName || !teacherForm.lastName || !teacherForm.username || !teacherForm.password) {
+      toast.error('All fields are required');
+      return;
+    }
+    setTeacherSaving(true);
+    try {
+      await api.post('/principal/teachers/create', teacherForm);
+      toast.success('Teacher created successfully!');
+      setShowTeacherModal(false);
+      setTeacherForm({ firstName: '', lastName: '', username: '', password: '' });
+      fetchTeachers();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create teacher');
+    } finally { setTeacherSaving(false); }
+  };
+
+  const handleDeleteTeacher = async (teacherId) => {
+    if (!window.confirm('Are you sure you want to delete this teacher? All their exams, questions, and results will also be deleted.')) return;
+    try {
+      await api.delete(`/principal/teachers/${teacherId}`);
+      toast.success('Teacher deleted successfully!');
+      fetchTeachers();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete teacher');
+    }
+  };
+
+  // ─── Student CRUD Handlers ──────────────────────────────────────────────
+  const handleCreateStudent = async (e) => {
+    e.preventDefault();
+    if (!studentForm.firstName || !studentForm.lastName || !studentForm.email || !studentForm.password || !studentForm.className || !studentForm.admissionNo) {
+      toast.error('All fields are required');
+      return;
+    }
+    setStudentSaving(true);
+    try {
+      await api.post('/principal/students/create', studentForm);
+      toast.success('Student created successfully!');
+      setShowStudentModal(false);
+      setStudentForm({ firstName: '', lastName: '', email: '', password: '', className: 'JSS1', admissionNo: '' });
+      fetchStudents();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create student');
+    } finally { setStudentSaving(false); }
+  };
+
+  const handleDeleteStudent = async (studentId) => {
+    if (!window.confirm('Are you sure you want to delete this student? All their results will also be deleted.')) return;
+    try {
+      await api.delete(`/principal/students/${studentId}`);
+      toast.success('Student deleted successfully!');
+      fetchStudents();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete student');
+    }
+  };
+
   // ─── Filtered lists ─────────────────────────────────────────────────────
   const filteredTeachers = teachers.filter((t) => {
     const q = teacherSearch.toLowerCase();
@@ -544,8 +614,8 @@ export default function PrincipalDashboard() {
       {/* Logo Area */}
       <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #f59e0b, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(245,158,11,0.4)' }}>
-            <Crown size={24} color="#fff" />
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(245,158,11,0.4)', overflow: 'hidden', padding: 4 }}>
+            <img src="/resco-logo.png" alt="RESCO" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <div>
             <h2 style={{ fontSize: 16, fontWeight: 800, color: '#fff', margin: 0 }}>RESCO-CBT</h2>
@@ -613,9 +683,7 @@ export default function PrincipalDashboard() {
           borderRadius: 20, padding: '32px 36px', marginBottom: 28, color: '#fff', position: 'relative', overflow: 'hidden',
           animation: 'fadeInUp 0.5s ease both',
         }}>
-          <div style={{ position: 'absolute', top: -30, right: -20, opacity: 0.1, fontSize: 140 }}>
-            <School />
-          </div>
+          <img src="/resco-logo.png" alt="" style={{ position: 'absolute', top: -20, right: -10, width: 200, height: 200, objectFit: 'contain', opacity: 0.15 }} />
           <div style={{ position: 'absolute', bottom: -20, right: 80, opacity: 0.08, fontSize: 100, animation: 'float 6s ease-in-out infinite' }}>
             <Award />
           </div>
@@ -906,17 +974,17 @@ export default function PrincipalDashboard() {
     );
   };
 
-  // ─── Tab: Teachers (read-only) ──────────────────────────────────────────
+  // ─── Tab: Teachers (Management) ──────────────────────────────────────────
   const renderTeachers = () => (
     <div style={{ animation: 'fadeIn 0.35s ease both' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Teachers Overview</h2>
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Teachers Management</h2>
           <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0' }}>{teachers.length} teacher(s) registered</p>
         </div>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: '#fef3c7', color: '#92400e', fontSize: 13, fontWeight: 600 }}>
-          <Eye size={15} /> Read-Only View
-        </span>
+        <button onClick={() => { setTeacherForm({ firstName: '', lastName: '', username: '', password: '' }); setShowTeacherModal(true); }} style={primaryBtn}>
+          <UserPlus size={18} /> Create Teacher
+        </button>
       </div>
 
       <div style={{ position: 'relative', marginBottom: 20, maxWidth: 400 }}>
@@ -956,6 +1024,11 @@ export default function PrincipalDashboard() {
                 <span>{t.examCount} exam(s)</span>
                 <span>{t.email}</span>
               </div>
+              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => handleDeleteTeacher(t.id)} style={dangerBtn}>
+                  <Trash2 size={13} /> Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -963,17 +1036,17 @@ export default function PrincipalDashboard() {
     </div>
   );
 
-  // ─── Tab: Students (read-only) ──────────────────────────────────────────
+  // ─── Tab: Students (Management) ──────────────────────────────────────────
   const renderStudents = () => (
     <div style={{ animation: 'fadeIn 0.35s ease both' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Students Overview</h2>
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Students Management</h2>
           <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0' }}>{students.length} student(s) enrolled</p>
         </div>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: '#fef3c7', color: '#92400e', fontSize: 13, fontWeight: 600 }}>
-          <Eye size={15} /> Read-Only View
-        </span>
+        <button onClick={() => { setStudentForm({ firstName: '', lastName: '', email: '', password: '', className: 'JSS1', admissionNo: '' }); setShowStudentModal(true); }} style={primaryBtn}>
+          <GraduationCap size={18} /> Create Student
+        </button>
       </div>
 
       <div style={{ position: 'relative', marginBottom: 20, maxWidth: 400 }}>
@@ -991,7 +1064,7 @@ export default function PrincipalDashboard() {
           <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04)' }}>
             <thead>
               <tr style={{ background: 'linear-gradient(135deg, #d97706, #b45309)' }}>
-                {['S/N', 'Name', 'Admission No.', 'Class', 'Email', 'Exams Taken'].map((h) => (
+                {['S/N', 'Name', 'Admission No.', 'Class', 'Email', 'Exams Taken', 'Actions'].map((h) => (
                   <th key={h} style={{ padding: '14px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     {h}
                   </th>
@@ -1009,6 +1082,11 @@ export default function PrincipalDashboard() {
                   </td>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: '#64748b' }}>{s.email}</td>
                   <td style={{ padding: '12px 16px', fontWeight: 700, color: '#6366f1' }}>{s.resultCount}</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <button onClick={() => handleDeleteStudent(s.id)} style={dangerBtn}>
+                      <Trash2 size={13} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1448,6 +1526,101 @@ export default function PrincipalDashboard() {
           </div>
         </div>
       )}
+
+      {/* ─── Create Teacher Modal ─── */}
+      {showTeacherModal && (
+        <div style={modalOverlay} onClick={(ev) => { if (ev.target === ev.currentTarget) setShowTeacherModal(false); }}>
+          <div style={modalCard}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <UserPlus size={20} style={{ color: '#d97706' }} /> Create Teacher
+              </h3>
+              {renderModalClose(() => setShowTeacherModal(false))}
+            </div>
+            <form onSubmit={handleCreateTeacher}>
+              <div style={{ display: 'grid', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>First Name *</label>
+                    <input type="text" value={teacherForm.firstName} onChange={(ev) => setTeacherForm({ ...teacherForm, firstName: ev.target.value })} placeholder="e.g. John" style={inputStyle} required />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Last Name *</label>
+                    <input type="text" value={teacherForm.lastName} onChange={(ev) => setTeacherForm({ ...teacherForm, lastName: ev.target.value })} placeholder="e.g. Smith" style={inputStyle} required />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Username *</label>
+                  <input type="text" value={teacherForm.username} onChange={(ev) => setTeacherForm({ ...teacherForm, username: ev.target.value })} placeholder="e.g. jsmith" style={inputStyle} required />
+                  <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Login email will be auto-generated as: username@resco.local</p>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Password *</label>
+                  <input type="password" value={teacherForm.password} onChange={(ev) => setTeacherForm({ ...teacherForm, password: ev.target.value })} placeholder="Min 6 characters" style={inputStyle} required minLength={6} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowTeacherModal(false)} style={secondaryBtn}>Cancel</button>
+                <button type="submit" disabled={teacherSaving} style={primaryBtn}>
+                  {teacherSaving ? 'Creating...' : <><UserPlus size={15} /> Create Teacher</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Create Student Modal ─── */}
+      {showStudentModal && (
+        <div style={modalOverlay} onClick={(ev) => { if (ev.target === ev.currentTarget) setShowStudentModal(false); }}>
+          <div style={modalCard}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <GraduationCap size={20} style={{ color: '#d97706' }} /> Create Student
+              </h3>
+              {renderModalClose(() => setShowStudentModal(false))}
+            </div>
+            <form onSubmit={handleCreateStudent}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>First Name *</label>
+                  <input type="text" value={studentForm.firstName} onChange={(ev) => setStudentForm({ ...studentForm, firstName: ev.target.value })} placeholder="e.g. Ade" style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Last Name *</label>
+                  <input type="text" value={studentForm.lastName} onChange={(ev) => setStudentForm({ ...studentForm, lastName: ev.target.value })} placeholder="e.g. Johnson" style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Email *</label>
+                  <input type="email" value={studentForm.email} onChange={(ev) => setStudentForm({ ...studentForm, email: ev.target.value })} placeholder="e.g. ade@resco.local" style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Password *</label>
+                  <input type="password" value={studentForm.password} onChange={(ev) => setStudentForm({ ...studentForm, password: ev.target.value })} placeholder="Min 6 characters" style={inputStyle} required minLength={6} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Class *</label>
+                  <select value={studentForm.className} onChange={(ev) => setStudentForm({ ...studentForm, className: ev.target.value })} style={selectStyle} required>
+                    <option value="">Select class</option>
+                    {['JSS1', 'JSS2', 'JSS3', 'SSS1', 'SSS2', 'SSS3'].map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Admission No. *</label>
+                  <input type="text" value={studentForm.admissionNo} onChange={(ev) => setStudentForm({ ...studentForm, admissionNo: ev.target.value })} placeholder="e.g. RES/2024/001" style={inputStyle} required />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowStudentModal(false)} style={secondaryBtn}>Cancel</button>
+                <button type="submit" disabled={studentSaving} style={primaryBtn}>
+                  {studentSaving ? 'Creating...' : <><GraduationCap size={15} /> Create Student</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 
@@ -1618,6 +1791,10 @@ export default function PrincipalDashboard() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
       <style>{KEYFRAMES}</style>
+      {/* Logo Background Watermark */}
+      <div style={{ position: 'fixed', top: '50%', left: '55%', transform: 'translate(-50%, -50%)', opacity: 0.03, pointerEvents: 'none', zIndex: 0 }}>
+        <img src="/resco-logo.png" alt="" style={{ width: 500, height: 500, objectFit: 'contain' }} />
+      </div>
 
       {/* Sidebar Overlay (mobile) */}
       {sidebarOpen && (
@@ -1638,7 +1815,7 @@ export default function PrincipalDashboard() {
       )}
 
       {/* Main Content */}
-      <div style={{ flex: 1, padding: '24px 28px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+      <div style={{ flex: 1, padding: '24px 28px', maxWidth: 1200, margin: '0 auto', width: '100%', position: 'relative', zIndex: 1 }}>
         {/* Mobile Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#374151' }}>

@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../config/database');
+const bcrypt = require('bcryptjs');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/roleMiddleware');
 
@@ -759,5 +760,269 @@ router.get('/results/export/:examId', async (req, res) => {
 // 9. GET /change-password — Principal Password Change (reuses auth)
 // This is handled by the global /api/auth/change-password endpoint
 // ============================================================
+
+// ============================================================
+// POST /principal/teachers/create — Create Teacher
+// ============================================================
+router.post('/teachers/create', async (req, res) => {
+  try {
+    const { firstName, lastName, username, password } = req.body;
+    if (!firstName || !lastName || !username || !password) {
+      return res.status(400).json({ success: false, message: 'Missing required fields: firstName, lastName, username, password' });
+    }
+    const trimmedUsername = username.trim().toLowerCase();
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+    const existingTeacher = await prisma.teacher.findUnique({ where: { username: trimmedUsername } });
+    if (existingTeacher) {
+      return res.status(409).json({ success: false, message: 'A teacher with this username already exists' });
+    }
+    const generatedEmail = `${trimmedUsername}@resco.local`;
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const teacher = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { email: generatedEmail, password: hashedPassword, role: 'TEACHER' },
+      });
+      return tx.teacher.create({
+        data: {
+          id: user.id,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          username: trimmedUsername,
+          status: 'ACTIVE',
+          subjects: '[]',
+        },
+        include: { user: { select: { email: true, createdAt: true } } },
+      });
+    });
+    res.status(201).json({
+      success: true,
+      id: teacher.id,
+      firstName: teacher.firstName,
+      lastName: teacher.lastName,
+      username: teacher.username,
+      status: teacher.status,
+      message: 'Teacher created successfully',
+    });
+  } catch (error) {
+    console.error('[Principal Create Teacher Error]', error);
+    res.status(500).json({ success: false, message: 'Failed to create teacher' });
+  }
+});
+
+// ============================================================
+// DELETE /principal/teachers/:id — Delete Teacher
+// ============================================================
+router.delete('/teachers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const teacher = await prisma.teacher.findUnique({
+      where: { id },
+      include: { _count: { select: { exams: true } } },
+    });
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Teacher not found' });
+    }
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (user && (user.role === 'ADMIN' || user.role === 'PRINCIPAL')) {
+      return res.status(403).json({ success: false, message: 'Cannot delete this user' });
+    }
+    await prisma.$transaction(async (tx) => {
+      const exams = await tx.exam.findMany({ where: { teacherId: id }, select: { id: true } });
+      if (exams.length > 0) {
+        const examIds = exams.map(e => e.id);
+        await tx.resultAnswer.deleteMany({ where: { question: { examId: { in: examIds } } } });
+        await tx.result.deleteMany({ where: { examId: { in: examIds } } });
+        await tx.examQuestion.deleteMany({ where: { examId: { in: examIds } } });
+        await tx.exam.deleteMany({ where: { teacherId: id } });
+      }
+      await tx.teacher.delete({ where: { id } });
+      await tx.user.delete({ where: { id } });
+    });
+    res.json({ success: true, message: 'Teacher deleted successfully' });
+  } catch (error) {
+    console.error('[Principal Delete Teacher Error]', error);
+    res.status(500).json({ success: false, message: 'Failed to delete teacher' });
+  }
+});
+
+// ============================================================
+// POST /principal/students/create — Create Single Student
+// ============================================================
+router.post('/students/create', async (req, res) => {
+  try {
+    const { email, password, firstName, lastName, className, admissionNo } = req.body;
+    if (!email || !password || !firstName || !lastName || !className || !admissionNo) {
+      return res.status(400).json({ success: false, message: 'Missing required fields: email, password, firstName, lastName, className, admissionNo' });
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ success: false, message: 'Invalid email format' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedAdmissionNo = admissionNo.trim();
+    const existingUser = await prisma.user.findUnique({ where: { email: trimmedEmail } });
+    if (existingUser) {
+      return res.status(409).json({ success: false, message: 'A user with this email already exists' });
+    }
+    const existingStudent = await prisma.student.findUnique({ where: { admissionNo: trimmedAdmissionNo } });
+    if (existingStudent) {
+      return res.status(409).json({ success: false, message: 'A student with this admission number already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const student = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { email: trimmedEmail, password: hashedPassword, role: 'STUDENT' },
+      });
+      return tx.student.create({
+        data: {
+          id: user.id,
+          admissionNo: trimmedAdmissionNo,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          className: className.trim(),
+        },
+        include: { user: { select: { email: true, createdAt: true } } },
+      });
+    });
+    res.status(201).json({
+      success: true,
+      id: student.id,
+      admissionNo: student.admissionNo,
+      firstName: student.firstName,
+      lastName: student.lastName,
+      className: student.className,
+      email: student.user?.email,
+      message: 'Student created successfully',
+    });
+  } catch (error) {
+    console.error('[Principal Create Student Error]', error);
+    if (error.code === 'P2002') {
+      const target = error.meta?.target || [];
+      if (target.includes('email')) return res.status(409).json({ success: false, message: 'A user with this email already exists.' });
+      if (target.includes('admission_no')) return res.status(409).json({ success: false, message: 'A student with this admission number already exists.' });
+    }
+    res.status(500).json({ success: false, message: 'Failed to create student' });
+  }
+});
+
+// ============================================================
+// POST /principal/students/bulk — Bulk Create Students
+// ============================================================
+router.post('/students/bulk', async (req, res) => {
+  try {
+    const { students } = req.body;
+    if (!students || !Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({ success: false, message: 'Request body must contain a non-empty "students" array' });
+    }
+    if (students.length > 500) {
+      return res.status(400).json({ success: false, message: 'Maximum 500 students per request' });
+    }
+    const errors = [];
+    const validStudents = [];
+    for (let i = 0; i < students.length; i++) {
+      const s = students[i];
+      const row = i + 1;
+      if (!s.email || !s.password || !s.firstName || !s.lastName || !s.className || !s.admissionNo) {
+        errors.push({ row, admissionNo: s.admissionNo || 'N/A', error: 'Missing required fields' });
+        continue;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(s.email)) {
+        errors.push({ row, admissionNo: s.admissionNo, error: `Invalid email: ${s.email}` });
+        continue;
+      }
+      if (s.password.length < 6) {
+        errors.push({ row, admissionNo: s.admissionNo, error: 'Password must be at least 6 characters' });
+        continue;
+      }
+      validStudents.push({
+        email: s.email.trim().toLowerCase(),
+        password: s.password,
+        firstName: s.firstName.trim(),
+        lastName: s.lastName.trim(),
+        className: s.className.trim(),
+        admissionNo: s.admissionNo.trim(),
+      });
+    }
+    if (validStudents.length === 0) {
+      return res.status(400).json({ success: false, created: 0, errors, message: 'No valid student records' });
+    }
+    const admissionNos = validStudents.map(s => s.admissionNo);
+    const emailList = validStudents.map(s => s.email);
+    const dupAdmissionNos = admissionNos.filter((n, i) => admissionNos.indexOf(n) !== i);
+    const dupEmails = emailList.filter((e, i) => emailList.indexOf(e) !== i);
+    dupAdmissionNos.forEach(dup => errors.push({ admissionNo: dup, error: `Duplicate admission number in batch: ${dup}` }));
+    dupEmails.forEach(dup => errors.push({ admissionNo: validStudents.find(s => s.email === dup)?.admissionNo || 'N/A', error: `Duplicate email in batch: ${dup}` }));
+    const cleanStudents = validStudents.filter(s => !dupAdmissionNos.includes(s.admissionNo) && !dupEmails.includes(s.email));
+    if (cleanStudents.length === 0) {
+      return res.status(400).json({ success: false, created: 0, errors, message: 'All records have duplicates' });
+    }
+    const existingAdmissionNos = await prisma.student.findMany({ where: { admissionNo: { in: cleanStudents.map(s => s.admissionNo) } }, select: { admissionNo: true } });
+    const existingEmails = await prisma.user.findMany({ where: { email: { in: cleanStudents.map(s => s.email) } }, select: { email: true } });
+    const existingAdmSet = new Set(existingAdmissionNos.map(s => s.admissionNo));
+    const existingEmailSet = new Set(existingEmails.map(u => u.email));
+    const toCreate = cleanStudents.filter(s => {
+      if (existingAdmSet.has(s.admissionNo)) { errors.push({ admissionNo: s.admissionNo, error: 'Admission number already exists' }); return false; }
+      if (existingEmailSet.has(s.email)) { errors.push({ admissionNo: s.admissionNo, error: 'Email already exists' }); return false; }
+      return true;
+    });
+    let createdCount = 0;
+    if (toCreate.length > 0) {
+      await prisma.$transaction(async (tx) => {
+        for (const s of toCreate) {
+          const hashedPassword = await bcrypt.hash(s.password, 12);
+          const user = await tx.user.create({ data: { email: s.email, password: hashedPassword, role: 'STUDENT' } });
+          await tx.student.create({ data: { id: user.id, admissionNo: s.admissionNo, firstName: s.firstName, lastName: s.lastName, className: s.className } });
+          createdCount++;
+        }
+      });
+    }
+    res.status(201).json({
+      success: true,
+      created: createdCount,
+      total: students.length,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `${createdCount} student(s) created successfully${errors.length > 0 ? ` with ${errors.length} error(s)` : ''}`,
+    });
+  } catch (error) {
+    console.error('[Principal Bulk Create Students Error]', error);
+    res.status(500).json({ success: false, message: 'Failed to create students in bulk' });
+  }
+});
+
+// ============================================================
+// DELETE /principal/students/:id — Delete Student
+// ============================================================
+router.delete('/students/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const student = await prisma.student.findUnique({ where: { id } });
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (user && (user.role === 'ADMIN' || user.role === 'PRINCIPAL')) {
+      return res.status(403).json({ success: false, message: 'Cannot delete this user' });
+    }
+    await prisma.$transaction(async (tx) => {
+      const results = await tx.result.findMany({ where: { studentId: id }, select: { id: true } });
+      if (results.length > 0) {
+        await tx.resultAnswer.deleteMany({ where: { resultId: { in: results.map(r => r.id) } } });
+        await tx.result.deleteMany({ where: { id: { in: results.map(r => r.id) } } });
+      }
+      await tx.student.delete({ where: { id } });
+      await tx.user.delete({ where: { id } });
+    });
+    res.json({ success: true, message: 'Student deleted successfully' });
+  } catch (error) {
+    console.error('[Principal Delete Student Error]', error);
+    res.status(500).json({ success: false, message: 'Failed to delete student' });
+  }
+});
 
 module.exports = router;
