@@ -375,11 +375,22 @@ export default function PrincipalDashboard() {
     setQuestionsLoading(true);
     try {
       const res = await api.get(`/questions/${examId}`);
-      // API returns { success: true, data: { exam: {...}, questions: [...] } }
-      const qData = res.data?.data?.questions || res.data?.questions || [];
-      setQuestionsList(Array.isArray(qData) ? qData : []);
+      // Backend returns { success: true, data: { exam: {...}, questions: [...] } }
+      // Axios wraps in res.data, so: res.data.data.questions
+      const payload = res.data?.data;
+      if (payload && Array.isArray(payload.questions)) {
+        setQuestionsList(payload.questions);
+      } else if (res.data?.questions && Array.isArray(res.data.questions)) {
+        setQuestionsList(res.data.questions);
+      } else if (Array.isArray(res.data)) {
+        setQuestionsList(res.data);
+      } else {
+        console.warn('[fetchQuestions] Unexpected response:', res.data);
+        setQuestionsList([]);
+      }
     } catch (err) {
-      toast.error('Failed to load questions');
+      console.error('[fetchQuestions] Error:', err.response?.status, err.response?.data);
+      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to load questions');
       setQuestionsList([]);
     } finally { setQuestionsLoading(false); }
   };
@@ -1388,11 +1399,11 @@ export default function PrincipalDashboard() {
               ) : (
                 <div style={{ maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {questionsList.map((q, qIdx) => (
-                    <div key={q.id || qIdx} style={{ padding: 12, border: '1px solid #e2e8f0', borderRadius: 10, background: '#fafafa', animation: 'fadeInUp 0.3s ease ' + (qIdx * 0.04) + 's both' }}>
+                    <div key={q.id || qIdx} style={{ padding: 12, border: '1px solid #e2e8f0', borderRadius: 10, background: '#fafafa' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 3 }}>Q{qIdx + 1}.</p>
-                          <p style={{ fontSize: 13, color: '#1e293b', fontWeight: 500, margin: 0, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{q.question || q.questionText}</p>
+                          <p style={{ fontSize: 13, color: '#1e293b', fontWeight: 500, margin: 0, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{q.question || ''}</p>
                           <div style={{ display: 'flex', gap: 12, fontSize: 12, color: '#64748b', flexWrap: 'wrap' }}>
                             <span>A: {q.optionA}</span>
                             <span>B: {q.optionB}</span>
@@ -1409,7 +1420,7 @@ export default function PrincipalDashboard() {
                       </div>
                       {!questionsReadOnly && (
                         <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
-                          <button onClick={() => { setEditingQuestion(q); setQForm({ question: q.question || q.questionText || '', optionA: q.optionA || '', optionB: q.optionB || '', optionC: q.optionC || '', optionD: q.optionD || '', answer: q.answer || 'A', marks: q.marks || 1 }); }} style={{ ...secondaryBtn, padding: '4px 10px', fontSize: 11 }}>
+                          <button onClick={() => { setEditingQuestion(q); setQForm({ question: q.question || '', optionA: q.optionA || '', optionB: q.optionB || '', optionC: q.optionC || '', optionD: q.optionD || '', answer: q.answer || 'A', marks: q.marks || 1 }); }} style={{ ...secondaryBtn, padding: '4px 10px', fontSize: 11 }}>
                             <Edit3 size={12} /> Edit
                           </button>
                           <button onClick={() => handleDeleteQuestion(q.id)} style={{ ...dangerBtn, padding: '4px 10px', fontSize: 11 }}>
