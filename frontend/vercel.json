@@ -1,6 +1,18 @@
 {
   "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/.well-known/assetlinks.json",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" }
+      ]
+    }
+  ],
   "rewrites": [
+    { "source": "/.well-known/(.*)", "destination": "/.well-known/$1" },
+    { "source": "/sw.js", "destination": "/sw.js" },
+    { "source": "/workbox-.*\\.js", "destination": "/workbox-$1.js" },
+    { "source": "/manifest.webmanifest", "destination": "/manifest.webmanifest" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
