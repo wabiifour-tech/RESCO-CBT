@@ -21,7 +21,8 @@ const upload = multer({
     ];
     const allowedExtensions = ['.csv'];
 
-    const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+    const originalName = file.originalname || '';
+    const ext = originalName.toLowerCase().slice(originalName.lastIndexOf('.'));
     if (allowedMimes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {

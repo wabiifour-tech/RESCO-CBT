@@ -17,7 +17,8 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   fileFilter: (req, file, cb) => {
     const allowedExtensions = ['.csv', '.pdf', '.docx', '.doc', '.txt'];
-    const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+    const originalName = file.originalname || '';
+    const ext = originalName.toLowerCase().slice(originalName.lastIndexOf('.'));
     if (allowedExtensions.includes(ext)) cb(null, true);
     else cb(new Error('Only CSV, PDF, DOCX, and TXT files are allowed.'));
   },
@@ -172,7 +173,7 @@ router.get('/teachers', async (req, res) => {
         username: t.username,
         email: t.user.email,
         status: t.status,
-        subjects: JSON.parse(t.subjects || '[]'),
+        subjects: (() => { try { return JSON.parse(t.subjects || '[]'); } catch (_) { return []; } })(),
         createdAt: t.user.createdAt,
         examCount: t._count.exams,
       })),
@@ -826,7 +827,7 @@ router.get('/analytics', async (req, res) => {
 
     const performanceByClass = Object.entries(classScores).map(([className, data]) => ({
       className,
-      averageScore: Math.round((data.total / data.count) * 100) / 100,
+      averageScore: data.count > 0 ? Math.round((data.total / data.count) * 100) / 100 : 0,
       studentCount: data.count,
     }));
 
@@ -844,7 +845,7 @@ router.get('/analytics', async (req, res) => {
 
     const performanceBySubject = Object.entries(subjectScores).map(([subject, data]) => ({
       subject,
-      averageScore: Math.round((data.total / data.count) * 100) / 100,
+      averageScore: data.count > 0 ? Math.round((data.total / data.count) * 100) / 100 : 0,
       resultCount: data.count,
     }));
 
@@ -1372,7 +1373,7 @@ function parseTextQuestions(text) {
     for (let i = startIdx; i < lines.length; i++) {
       const sep = lines[i].includes('|') ? '|' : '\t';
       const parts = lines[i].split(sep).map(p => p.trim());
-      if (parts.length >= 6) {
+      if (parts.length >= 6 && parts[0] && parts[1] && parts[2] && parts[3] && parts[4] && parts[5]) {
         questions.push({
           question: parts[0], optionA: parts[1], optionB: parts[2],
           optionC: parts[3], optionD: parts[4], answer: parts[5].toUpperCase(),
@@ -1447,7 +1448,8 @@ router.post('/questions/upload', upload.single('file'), async (req, res) => {
     if (!exam) return res.status(404).json({ error: 'Exam not found.' });
     if (exam.status !== 'DRAFT') return res.status(400).json({ error: 'Only DRAFT exams can be modified.' });
 
-    const ext = req.file.originalname.toLowerCase().slice(req.file.originalname.lastIndexOf('.'));
+    const originalName = req.file.originalname || '';
+    const ext = originalName.toLowerCase().slice(originalName.lastIndexOf('.'));
     let parsed;
 
     if (ext === '.csv') {

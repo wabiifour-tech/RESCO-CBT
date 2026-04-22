@@ -439,7 +439,7 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
         Math.round(r.timeSpent / 60),
         r.examStartTime ? r.examStartTime.toISOString().replace('T', ' ').substring(0, 19) : '',
         r.examEndTime ? r.examEndTime.toISOString().replace('T', ' ').substring(0, 19) : '',
-        r.submittedAt.toISOString().replace('T', ' ').substring(0, 19),
+        r.submittedAt ? r.submittedAt.toISOString().replace('T', ' ').substring(0, 19) : '',
       ]);
 
       const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
