@@ -138,7 +138,7 @@ router.post('/login', async (req, res) => {
         lastName: user.teacher.lastName,
         username: user.teacher.username,
         status: user.teacher.status,
-        subjects: JSON.parse(user.teacher.subjects || '[]'),
+        subjects: (() => { try { return JSON.parse(user.teacher.subjects || '[]'); } catch (_) { return []; } })(),
       };
     }
 
@@ -269,7 +269,7 @@ router.get('/me', authenticate, async (req, res) => {
         lastName: user.teacher.lastName,
         username: user.teacher.username,
         status: user.teacher.status,
-        subjects: JSON.parse(user.teacher.subjects || '[]'),
+        subjects: (() => { try { return JSON.parse(user.teacher.subjects || '[]'); } catch (_) { return []; } })(),
       };
     }
 

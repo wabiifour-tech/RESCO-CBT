@@ -204,7 +204,7 @@ export default function StudentDashboard() {
     return function () { clearInterval(interval); };
   }, []);
 
-  // Timer
+  // Timer countdown
   useEffect(function () {
     if (view !== 'exam' || timeLeft <= 0) return;
     timerRef.current = setInterval(function () {
@@ -212,7 +212,6 @@ export default function StudentDashboard() {
         if (t <= 1) {
           clearInterval(timerRef.current);
           timerRef.current = null;
-          doSubmitExam();
           return 0;
         }
         return t - 1;
@@ -225,6 +224,13 @@ export default function StudentDashboard() {
       }
     };
   }, [view, timeLeft]);
+
+  // Auto-submit when timer reaches zero (separate effect avoids calling async inside state updater)
+  useEffect(function () {
+    if (view === 'exam' && timeLeft === 0 && !examResult && !submitting) {
+      doSubmitExam();
+    }
+  }, [view, timeLeft, examResult, submitting]);
 
   // Cleanup timer on unmount
   useEffect(function () {
@@ -280,7 +286,7 @@ export default function StudentDashboard() {
         examStartTime: startTimeRef.current ? new Date(startTimeRef.current).toISOString() : null,
       });
       setExamResult(res.data.result);
-      toast.success(res.data.result.passed ? 'Congratulations! You passed!' : 'Exam submitted. Keep practicing!');
+      toast.success(res.data.result.passed === true ? 'Congratulations! You passed!' : 'Exam submitted. Keep practicing!');
       fetchResults();
       fetchExams();
     } catch (err) {
@@ -294,7 +300,13 @@ export default function StudentDashboard() {
     doSubmitExam();
   };
 
-  const exitToDashboard = function () {
+  const exitToDashboard = function (force) {
+    // If taking an exam and result not yet submitted, confirm before leaving
+    if (!force && view === 'exam' && !examResult) {
+      if (!window.confirm('Are you sure you want to leave? Your progress will be lost and you cannot retake this exam.')) {
+        return;
+      }
+    }
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -411,7 +423,8 @@ export default function StudentDashboard() {
       );
     }
 
-    const passed = examResult.passed;
+    const passed = examResult.passed !== undefined ? examResult.passed
+      : (examResult.percentage || 0) >= (examDetail && examDetail.passMark ? examDetail.passMark : 50);
     const scorePercent = examResult.percentage || 0;
     const circumference = 2 * Math.PI * 80;
     const strokeDashoffset = circumference - (scorePercent / 100) * circumference;
@@ -729,7 +742,7 @@ export default function StudentDashboard() {
                   <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
                     <div
                       className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: (answeredCount / questions.length * 100) + '%' }}
+                      style={{ width: (questions.length > 0 ? (answeredCount / questions.length * 100) : 0) + '%' }}
                     />
                   </div>
                 </div>

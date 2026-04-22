@@ -49,20 +49,29 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
       where: { examId },
     });
 
-    // Build question map
+    // Guard: exam must have at least one question
+    if (questions.length === 0) {
+      return res.status(400).json({ success: false, message: 'This exam has no questions.' });
+    }
+
+    // Build question map and validate submitted question IDs
     const questionMap = {};
     questions.forEach(q => { questionMap[q.id] = q; });
 
+    // Filter answers to only include valid question IDs for this exam
+    const validAnswers = answers.filter(a => a.questionId && questionMap[a.questionId]);
+    if (validAnswers.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid answers provided.' });
+    }
+
     // Grade answers
     let score = 0;
-    const resultAnswers = answers.map(a => {
+    const resultAnswers = validAnswers.map(a => {
       const question = questionMap[a.questionId];
       // Defensive: ensure we only compare single letters (A/B/C/D)
       const selectedUpper = a.selected ? String(a.selected).toUpperCase().trim().charAt(0) : null;
       const correctAnswer = question ? String(question.answer).toUpperCase().trim().charAt(0) : null;
       const isCorrect = question && selectedUpper && correctAnswer ? (selectedUpper === correctAnswer) : false;
-
-      console.log(`[GRADING] qId=${a.questionId} selected="${a.selected}" → "${selectedUpper}" vs answer="${correctAnswer}" → ${isCorrect ? 'CORRECT' : 'WRONG'}`);
 
       if (isCorrect) score += question.marks;
       return {
@@ -205,7 +214,7 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
     const result = await prisma.result.findUnique({
       where: { examId_studentId: { examId, studentId: req.user.userId } },
       include: {
-        exam: { select: { id: true, title: true, subject: true, resultVisibility: true, endDate: true } },
+        exam: { select: { id: true, title: true, subject: true, resultVisibility: true, endDate: true, passMark: true } },
         answers: { include: { question: { select: { question: true, optionA: true, optionB: true, optionC: true, optionD: true, answer: true } } } },
       },
     });
@@ -233,6 +242,7 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
     if (result.exam.resultVisibility === 'AFTER_CLOSE') {
       const endDate = result.exam.endDate;
       const hasEnd = endDate && !isNaN(new Date(endDate).getTime());
+      const passMark = result.exam.passMark || 50;
       if (hasEnd && new Date(endDate) > new Date()) {
         return res.status(200).json({
           success: true,
@@ -241,6 +251,7 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
             score: result.score,
             totalMarks: result.totalMarks,
             percentage: result.percentage,
+            passed: result.percentage >= passMark,
             submittedAt: result.submittedAt,
             examStartTime: result.examStartTime,
             examEndTime: result.examEndTime,

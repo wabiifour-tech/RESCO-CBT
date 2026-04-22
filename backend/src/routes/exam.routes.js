@@ -119,9 +119,9 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
         ...(title && { title }),
         ...(description !== undefined && { description }),
         ...(type && { type }),
-        ...(duration && { duration }),
-        ...(totalMarks && { totalMarks }),
-        ...(passMark && { passMark }),
+        ...(duration && { duration: parseInt(duration, 10) }),
+        ...(totalMarks && { totalMarks: parseInt(totalMarks, 10) }),
+        ...(passMark && { passMark: parseInt(passMark, 10) }),
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
         ...(resultVisibility && { resultVisibility }),
@@ -178,10 +178,16 @@ router.patch('/:id/archive', authenticate, requireRole('TEACHER', 'ADMIN'), asyn
   try {
     const { id } = req.params;
 
-    const exam = await prisma.exam.findUnique({ where: { id } });
+    const where = { id };
+    // Teachers can only archive their own exams; admins can archive any
+    if (req.user.role === 'TEACHER') {
+      where.teacherId = req.user.userId;
+    }
+
+    const exam = await prisma.exam.findFirst({ where });
 
     if (!exam) {
-      return res.status(404).json({ success: false, message: 'Exam not found.' });
+      return res.status(404).json({ success: false, message: 'Exam not found or not yours.' });
     }
 
     const archived = await prisma.exam.update({
@@ -289,6 +295,16 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
       return res.status(400).json({ success: false, message: 'This exam is not available.' });
     }
 
+    // Verify the student belongs to the exam's class
+    const student = await prisma.student.findUnique({
+      where: { id: req.user.userId },
+      select: { className: true },
+    });
+
+    if (!student || student.className !== exam.className) {
+      return res.status(403).json({ success: false, message: 'This exam is not available for your class.' });
+    }
+
     // Check student hasn't already taken it
     const existingResult = await prisma.result.findUnique({
       where: { examId_studentId: { examId: id, studentId: req.user.userId } },
@@ -311,6 +327,11 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
         marks: true,
       },
     });
+
+    // Guard: exam must have at least one question
+    if (questions.length === 0) {
+      return res.status(400).json({ success: false, message: 'This exam has no questions yet and cannot be taken.' });
+    }
 
     // Shuffle question order if enabled
     if (exam.shuffleQuestions) {

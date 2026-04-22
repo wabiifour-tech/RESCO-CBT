@@ -57,7 +57,7 @@ const authenticate = (req, res, next) => {
     }
 
     if (error.name === 'TokenExpiredError') {
-      return res.status(403).json({
+      return res.status(401).json({
         success: false,
         message: 'Token expired. Please log in again.',
       });
