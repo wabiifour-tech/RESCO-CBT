@@ -6,13 +6,27 @@
       "headers": [
         { "key": "Content-Type", "value": "application/json" }
       ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    },
+    {
+      "source": "/workbox-:match*.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        { "key": "Content-Type", "value": "application/manifest+json" }
+      ]
     }
   ],
   "rewrites": [
-    { "source": "/.well-known/(.*)", "destination": "/.well-known/$1" },
-    { "source": "/sw.js", "destination": "/sw.js" },
-    { "source": "/workbox-.*\\.js", "destination": "/workbox-$1.js" },
-    { "source": "/manifest.webmanifest", "destination": "/manifest.webmanifest" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
