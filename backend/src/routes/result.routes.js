@@ -459,7 +459,7 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
         r.score,
         r.totalMarks,
         `${r.percentage}%`,
-        Math.round(r.timeSpent / 60),
+        r.timeSpent != null ? Math.round(r.timeSpent / 60) : 'N/A',
         r.examStartTime ? r.examStartTime.toISOString().replace('T', ' ').substring(0, 19) : '',
         r.examEndTime ? r.examEndTime.toISOString().replace('T', ' ').substring(0, 19) : '',
         r.submittedAt ? r.submittedAt.toISOString().replace('T', ' ').substring(0, 19) : '',
@@ -513,9 +513,11 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
       drawWatermark();
 
       const studentName = result.student ? `${result.student.firstName} ${result.student.lastName}` : 'Unknown Student';
-      const examDate = result.submittedAt.toLocaleDateString('en-NG', {
-        year: 'numeric', month: 'long', day: 'numeric',
-      });
+      const examDate = result.submittedAt
+        ? result.submittedAt.toLocaleDateString('en-NG', {
+            year: 'numeric', month: 'long', day: 'numeric',
+          })
+        : 'N/A';
       const startTimeStr = result.examStartTime
         ? result.examStartTime.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
         : 'N/A';

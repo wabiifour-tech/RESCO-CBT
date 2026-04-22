@@ -496,6 +496,14 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
       });
     }
 
+    // --- Verify exam exists (guard against orphaned questions) ---
+    if (!question.exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Associated exam not found for this question.',
+      });
+    }
+
     // --- Verify exam belongs to this teacher ---
     if (question.exam.teacherId !== req.user.userId) {
       return res.status(403).json({
@@ -553,6 +561,14 @@ router.delete('/:id', authenticate, requireRole('TEACHER'), async (req, res) => 
       return res.status(404).json({
         success: false,
         message: 'Question not found.',
+      });
+    }
+
+    // --- Verify exam exists (guard against orphaned questions) ---
+    if (!question.exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Associated exam not found for this question.',
       });
     }
 

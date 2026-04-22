@@ -33,6 +33,7 @@ const NAV_ITEMS = [
   { id: 'exams',       label: 'Exams',       icon: BookOpen },
   { id: 'questions',   label: 'Questions',   icon: FileQuestion },
   { id: 'analytics',   label: 'Analytics',   icon: TrendingUp },
+  { id: 'results',    label: 'Results',    icon: Download },
 ];
 
 // ─── Keyframes injected once ──────────────────────────────────────────────────
@@ -74,6 +75,8 @@ const cardBase = {
   border: '1px solid #f1f5f9',
   transition: 'box-shadow 0.25s ease, transform 0.25s ease',
 };
+
+const selectStyle = { width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#374151', background: '#fff', outline: 'none' };
 
 const hoverLift = {
   boxShadow: '0 4px 16px rgba(0,0,0,0.1), 0 8px 24px rgba(0,0,0,0.06)',
@@ -125,6 +128,16 @@ export default function AdminPanel() {
   // Form data
   const [teacherForm, setTeacherForm] = useState({ firstName: '', lastName: '', username: '', password: '' });
   const [studentForm, setStudentForm] = useState({ firstName: '', lastName: '', admissionNo: '', className: '', email: '', password: '' });
+
+  // Results tab state
+  const [resClasses, setResClasses] = useState([]);
+  const [resSubjects, setResSubjects] = useState([]);
+  const [resExams, setResExams] = useState([]);
+  const [resClass, setResClass] = useState('');
+  const [resSubject, setResSubject] = useState('');
+  const [resExamId, setResExamId] = useState('');
+  const [resLoading, setResLoading] = useState(false);
+  const [resPreview, setResPreview] = useState(null);
 
   // Sidebar responsive state
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -221,6 +234,32 @@ export default function AdminPanel() {
     else if (activeTab === 'questions') fetchDraftExams();
     else if (activeTab === 'exams') fetchAllExams();
   }, [activeTab, fetchDashboard, fetchTeachers, fetchStudents, fetchAnalytics, fetchDraftExams, fetchAllExams]);
+
+  // ─── Results: fetch filter options ───────────────────────────────────────────
+  useEffect(() => {
+    if (activeTab === 'results') {
+      api.get('/admin/results/filter-options').then(({ data }) => {
+        setResClasses(data.classes || []);
+        setResSubjects(data.subjects || []);
+      }).catch(() => {});
+    }
+  }, [activeTab]);
+
+  // ─── Results: cascading exam filter ──────────────────────────────────────────
+  useEffect(() => {
+    if (!resClass && !resSubject) { setResExams([]); return; }
+    api.get(`/admin/exams?status=PUBLISHED&class=${encodeURIComponent(resClass)}&subject=${encodeURIComponent(resSubject)}&limit=200`).then(({ data }) => {
+      setResExams(data.exams || []);
+    }).catch(() => { setResExams([]); });
+  }, [resClass, resSubject]);
+
+  // ─── Results: preview fetch ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'results' || !resExamId) { setResPreview(null); return; }
+    api.get(`/admin/results/${resExamId}`).then(({ data }) => {
+      setResPreview(data);
+    }).catch(() => { setResPreview(null); });
+  }, [activeTab, resExamId]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleLogout = () => {
@@ -482,7 +521,7 @@ export default function AdminPanel() {
   const filteredTeachers = teachers.filter((t) => {
     const q = teacherSearch.toLowerCase();
     return (
-      (t.firstName + ' ' + t.lastName).toLowerCase().includes(q) ||
+      ((t.firstName || '') + ' ' + (t.lastName || '')).toLowerCase().includes(q) ||
       (t.username || '').toLowerCase().includes(q) ||
       (t.email || '').toLowerCase().includes(q)
     );
@@ -491,7 +530,7 @@ export default function AdminPanel() {
   const filteredStudents = students.filter((s) => {
     const q = studentSearch.toLowerCase();
     return (
-      (s.firstName + ' ' + s.lastName).toLowerCase().includes(q) ||
+      ((s.firstName || '') + ' ' + (s.lastName || '')).toLowerCase().includes(q) ||
       (s.admissionNo || '').toLowerCase().includes(q) ||
       (s.email || '').toLowerCase().includes(q)
     );
@@ -699,7 +738,7 @@ export default function AdminPanel() {
                       {(t.firstName || '?')[0] + (t.lastName || '')[0]}
                     </div>
                     <div>
-                      <p style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>{t.firstName} {t.lastName}</p>
+                      <p style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>{t.firstName || ''} {t.lastName || ''}</p>
                       <p style={{ fontSize: 13, color: '#64748b', margin: '2px 0 0 0' }}>@{t.username || t.email}</p>
                     </div>
                   </div>
@@ -856,8 +895,8 @@ export default function AdminPanel() {
                   }
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>{s.firstName} {s.lastName}</p>
-                    <p style={{ fontSize: 13, color: '#64748b', margin: '2px 0 0 0' }}>{s.email}</p>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>{s.firstName || ''} {s.lastName || ''}</p>
+                    <p style={{ fontSize: 13, color: '#64748b', margin: '2px 0 0 0' }}>{s.email || 'No email'}</p>
                   </div>
                 </div>
 
@@ -1736,6 +1775,164 @@ export default function AdminPanel() {
     );
   };
 
+  // ─── Results: PDF download handler ──────────────────────────────────────────
+  const handleResDownloadPDF = async () => {
+    if (!resExamId) { toast.error('Please select an exam'); return; }
+    try {
+      toast.loading('Generating PDF...');
+      const res = await api.get(`/admin/results/export/${resExamId}?format=pdf`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (resExams.find(e => e.id === resExamId)?.title || 'results') + '.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.dismiss();
+      toast.success('PDF downloaded successfully!');
+    } catch (err) {
+      toast.dismiss();
+      toast.error(err.response?.data?.error || 'Failed to download PDF');
+    }
+  };
+
+  // ─── Tab Content: Results ────────────────────────────────────────────────────
+  const renderResults = () => {
+    return (
+      <div style={{ padding: '20px 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div>
+            <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Download size={20} /> Results
+            </h3>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0 0' }}>
+              Select class, subject and exam to export result sheets as PDF
+            </p>
+          </div>
+        </div>
+
+        {/* Filters Card */}
+        <div style={{ ...cardBase, marginBottom: 20, padding: 24, background: 'linear-gradient(135deg, #eef2ff, #faf5ff)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            {/* Class */}
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                Class <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select
+                value={resClass}
+                onChange={e => { setResClass(e.target.value); setResSubject(''); setResExamId(''); setResPreview(null); }}
+                style={selectStyle}
+              >
+                <option value="">-- Select Class --</option>
+                {resClasses.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            {/* Subject */}
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                Subject <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select
+                value={resSubject}
+                onChange={e => { setResSubject(e.target.value); setResExamId(''); setResPreview(null); }}
+                style={{ ...selectStyle, opacity: resClass ? 1 : 0.5 }}
+                disabled={!resClass}
+              >
+                <option value="">-- Select Subject --</option>
+                {resSubjects
+                  .filter(s => !resClass || resExams.some(e => e.className === resClass && e.subject === s))
+                  .map(s => <option key={s} value={s}>{s}</option>)
+                }
+              </select>
+            </div>
+
+            {/* Exam */}
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                Exam <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select
+                value={resExamId}
+                onChange={e => setResExamId(e.target.value)}
+                style={{ ...selectStyle, opacity: resSubject ? 1 : 0.5 }}
+                disabled={!resSubject}
+              >
+                <option value="">-- Select Exam --</option>
+                {resExams.map(e => (
+                  <option key={e.id} value={e.id}>{e.title} ({e.resultCount || 0} results)</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Download Button */}
+          <button
+            onClick={handleResDownloadPDF}
+            disabled={!resExamId || resLoading}
+            style={{
+              width: '100%', marginTop: 16, padding: '12px', fontSize: 14, fontWeight: 700,
+              color: '#fff', background: resExamId ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#d1d5db',
+              border: 'none', borderRadius: 10, cursor: resExamId ? 'pointer' : 'not-allowed',
+              transition: 'all 0.2s',
+            }}
+          >
+            {resLoading ? 'Generating...' : '\u2B07 Download PDF'}
+          </button>
+
+          {/* Info */}
+          <div style={{ marginTop: 16, padding: 14, background: '#eef2ff', borderRadius: 10, border: '1px solid #c7d2fe', fontSize: 12, color: '#4338ca' }}>
+            <p style={{ fontWeight: 600, marginBottom: 4 }}>About the PDF:</p>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11.5, lineHeight: 1.6, color: '#4338ca' }}>
+              <li>School name, motto and RESCO CBT watermark on every page</li>
+              <li>Student name, admission number, score, grade, pass/fail status</li>
+              <li>Official computer-generated document stamp (non-editable)</li>
+              <li>Principal &amp; teacher signature lines</li>
+              <li>Summary statistics: total, passed, failed, average, highest, lowest</li>
+            </ul>
+          </div>
+
+          {/* Preview */}
+          {resPreview && (
+            <div style={{ marginTop: 20, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>Preview: {resPreview.exam?.title}</span>
+                <span style={{ fontSize: 11, color: '#64748b', background: '#e2e8f0', padding: '2px 10px', borderRadius: 12 }}>{resPreview.summary?.total || 0} students</span>
+              </div>
+              <div style={{ padding: 12 }}>
+                <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#64748b', marginBottom: 12 }}>
+                  <span>Passed: <strong style={{ color: '#059669' }}>{resPreview.summary?.passed || 0}</strong></span>
+                  <span>Failed: <strong style={{ color: '#dc2626' }}>{resPreview.summary?.failed || 0}</strong></span>
+                  <span>Average: <strong>{resPreview.summary?.average || 0}%</strong></span>
+                </div>
+                {resPreview.results?.slice(0, 10).map((r, i) => (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderRadius: 6, fontSize: 12, borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ color: '#94a3b8', width: 24 }}>{i + 1}.</span>
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', color: '#1e293b' }}>{r.student?.firstName} {r.student?.lastName}</span>
+                    <span style={{ fontWeight: 600 }}>{r.percentage ?? 0}%</span>
+                    <span style={{ fontWeight: 600, color: (r.percentage || 0) >= 50 ? '#059669' : '#dc2626' }}>
+                      {(r.percentage || 0) >= 50 ? 'PASSED' : 'FAILED'}
+                    </span>
+                  </div>
+                ))}
+                {resPreview.results?.length > 10 && (
+                  <p style={{ textAlign: 'center', fontSize: 11, color: '#94a3b8' }}>...and {resPreview.results.length - 10} more</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {resExams.length === 0 && resClass && resSubject && (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: '#94a3b8', fontSize: 13 }}>No published exams found for this class/subject.</div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // ─── Tab Content Renderer ───────────────────────────────────────────────────
   const renderTabContent = () => {
     switch (activeTab) {
@@ -1745,6 +1942,7 @@ export default function AdminPanel() {
       case 'exams':       return renderExams();
       case 'questions':   return renderQuestions();
       case 'analytics':   return renderAnalytics();
+      case 'results':     return renderResults();
       default:            return renderDashboard();
     }
   };

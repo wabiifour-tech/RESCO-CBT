@@ -63,6 +63,16 @@ export default function TeacherDashboard() {
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadExamId, setUploadExamId] = useState('');
 
+  // Download Results state
+  const [downloadClasses, setDownloadClasses] = useState([]);
+  const [downloadSubjects, setDownloadSubjects] = useState([]);
+  const [downloadExams, setDownloadExams] = useState([]);
+  const [dlClass, setDlClass] = useState('');
+  const [dlSubject, setDlSubject] = useState('');
+  const [dlExamId, setDlExamId] = useState('');
+  const [dlLoading, setDlLoading] = useState(false);
+  const [dlPreview, setDlPreview] = useState(null);
+
   const fetchData = useCallback(async () => {
     try {
       const examsRes = await api.get('/exams/teacher');
@@ -89,10 +99,65 @@ export default function TeacherDashboard() {
     }
   }, []);
 
+  const fetchDownloadOptions = useCallback(async () => {
+    try {
+      const { data } = await api.get('/exams/teacher');
+      const examList = data.exams || [];
+      const classSet = new Set();
+      const subjectSet = new Set();
+      const classes = [];
+      const subjects = [];
+      for (const e of examList) {
+        if (e.className && !classSet.has(e.className)) { classSet.add(e.className); classes.push(e.className); }
+        if (e.subject && !subjectSet.has(e.subject)) { subjectSet.add(e.subject); subjects.push(e.subject); }
+      }
+      setDownloadClasses(classes);
+      setDownloadSubjects(subjects);
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     fetchData();
     fetchResults();
   }, [fetchData, fetchResults]);
+
+  useEffect(() => { fetchDownloadOptions(); }, [fetchDownloadOptions]);
+
+  useEffect(() => {
+    const examList = (exams || []).filter(e => e.status === 'PUBLISHED' && (!dlClass || e.className === dlClass) && (!dlSubject || e.subject === dlSubject));
+    setDownloadExams(examList);
+  }, [exams, dlClass, dlSubject]);
+
+  const fetchDlPreview = useCallback(async () => {
+    if (!dlExamId) { setDlPreview(null); return; }
+    try {
+      const { data } = await api.get(`/results/teacher/${dlExamId}/details`);
+      setDlPreview(data);
+    } catch { toast.error('Failed to load preview'); }
+  }, [dlExamId]);
+  useEffect(() => { fetchDlPreview(); }, [fetchDlPreview]);
+
+  const handleDownloadPDF = async () => {
+    if (!dlExamId) { toast.error('Please select an exam'); return; }
+    try {
+      toast.loading('Generating PDF...');
+      const res = await api.get(`/results/export/${dlExamId}?format=pdf`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (downloadExams.find(e => e.id === dlExamId)?.title || 'results') + '.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.dismiss();
+      toast.success('PDF downloaded successfully!');
+    } catch (err) {
+      toast.dismiss();
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to download PDF');
+    }
+  };
 
   const handleCreateExam = async (e) => {
     e.preventDefault();
@@ -363,7 +428,7 @@ export default function TeacherDashboard() {
                         <span className="font-bold text-sm text-gray-800">{r.percentage ?? 0}%</span>
                         <div className="w-16 bg-gray-200 rounded-full h-1.5 mt-1">
                           <div
-                            className={'h-1.5 rounded-full ' + (r.percentage >= 50 ? 'bg-green-500' : 'bg-red-400')}
+                            className={'h-1.5 rounded-full ' + ((r.percentage ?? 0) >= 50 ? 'bg-green-500' : 'bg-red-400')}
                             style={{ width: Math.min(r.percentage ?? 0, 100) + '%' }}
                           />
                         </div>
@@ -413,6 +478,178 @@ export default function TeacherDashboard() {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ========================
+  // RESULTS DOWNLOAD VIEW
+  // ========================
+  if (activeTab === 'download-results') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
+        <div className="resco-watermark"><img src="/resco-logo.png" alt="" /></div>
+        <style>{`
+          @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+          .anim-fade-in { animation: fadeInUp 0.6s ease-out both; }
+        `}</style>
+
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b sticky top-0 z-10">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+                <Download className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="font-bold text-gray-800">Download Results</h1>
+                <p className="text-xs text-gray-500">Teacher Portal — Export as PDF</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <LiveClock compact />
+              <span className="text-sm text-gray-600 hidden sm:inline">{getGreeting()}, <b>{user?.teacher?.firstName || user?.email}</b></span>
+              <button onClick={() => { logout(); window.location.href = '/'; }} className="text-gray-400 hover:text-red-500"><LogOut className="w-5 h-5" /></button>
+            </div>
+          </div>
+        </header>
+
+        <main className="max-w-3xl mx-auto p-4 sm:p-6">
+          {/* Back */}
+          <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-6 anim-fade-in group">
+            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Dashboard
+          </button>
+
+          {/* Card */}
+          <div className="anim-fade-in bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            {/* Card Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-5">
+              <div className="flex items-center gap-3 text-white">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Download className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">Export Exam Results as PDF</h2>
+                  <p className="text-white/80 text-sm">Select class, subject and exam to download a professional result sheet</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Class Selector */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Class <span className="text-red-400">*</span></label>
+                <select
+                  value={dlClass}
+                  onChange={e => { setDlClass(e.target.value); setDlSubject(''); setDlExamId(''); setDlPreview(null); }}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white"
+                >
+                  <option value="">-- Select Class --</option>
+                  {downloadClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              {/* Subject Selector */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Subject <span className="text-red-400">*</span></label>
+                <select
+                  value={dlSubject}
+                  onChange={e => { setDlSubject(e.target.value); setDlExamId(''); setDlPreview(null); }}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white"
+                  disabled={!dlClass}
+                >
+                  <option value="">-- Select Subject --</option>
+                  {downloadSubjects
+                    .filter(s => !dlClass || exams.some(e => e.className === dlClass && e.subject === s))
+                    .map(s => <option key={s} value={s}>{s}</option>)
+                  }
+                </select>
+              </div>
+
+              {/* Exam Selector */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Exam <span className="text-red-400">*</span></label>
+                <select
+                  value={dlExamId}
+                  onChange={e => setDlExamId(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white"
+                  disabled={!dlSubject}
+                >
+                  <option value="">-- Select Exam --</option>
+                  {downloadExams.map(e => (
+                    <option key={e.id} value={e.id}>{e.title} ({e._count?.results || 0} results)</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Download Button */}
+              <button
+                onClick={handleDownloadPDF}
+                disabled={!dlExamId || dlLoading}
+                className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-400 text-white font-bold py-3.5 px-6 rounded-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg shadow-indigo-200"
+              >
+                <Download className="w-5 h-5" />
+                {dlLoading ? 'Generating...' : 'Download PDF'}
+              </button>
+
+              {/* Info Text */}
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-indigo-700">
+                    <p className="font-semibold">About the PDF:</p>
+                    <ul className="list-disc list-inside mt-1 space-y-0.5 text-indigo-600 text-xs">
+                      <li>Includes school name, motto and logo watermark</li>
+                      <li>Shows each student's name, admission number, score, grade and status</li>
+                      <li>Has official stamp declaring it as a valid computer-generated document</li>
+                      <li>Includes principal and teacher signature lines</li>
+                      <li>Includes summary statistics (total, passed, failed, average, highest, lowest)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview */}
+              {dlPreview && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="bg-gray-50 px-5 py-3 border-b flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-indigo-500" />
+                      Results Preview — {dlPreview.exam?.title}
+                    </h3>
+                    <span className="text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{dlPreview.summary?.total || 0} students</span>
+                  </div>
+                  <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
+                    <div className="flex gap-4 text-xs text-gray-500">
+                      <span>Passed: <strong className="text-green-600">{dlPreview.summary?.passed || 0}</strong></span>
+                      <span>Failed: <strong className="text-red-600">{dlPreview.summary?.failed || 0}</strong></span>
+                      <span>Average: <strong>{dlPreview.summary?.average || 0}%</strong></span>
+                    </div>
+                    {dlPreview.results?.slice(0, 10).map((r, i) => (
+                      <div key={r.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-gray-50 text-xs">
+                        <span className="text-gray-500 w-6">{i + 1}.</span>
+                        <span className="flex-1 truncate">{r.student?.firstName} {r.student?.lastName}</span>
+                        <span className="font-bold">{r.percentage ?? 0}%</span>
+                        <span className={(r.percentage || 0) >= 50 ? 'text-green-600' : 'text-red-500'}>
+                          {(r.percentage || 0) >= 50 ? 'PASSED' : 'FAILED'}
+                        </span>
+                      </div>
+                    ))}
+                    {dlPreview.results?.length > 10 && (
+                      <p className="text-xs text-gray-400 text-center">...and {dlPreview.results.length - 10} more</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {downloadExams.length === 0 && dlClass && dlSubject && (
+                <div className="text-center py-8">
+                  <p className="text-gray-400 text-sm">No published exams found for this class/subject.</p>
+                </div>
+              )}
             </div>
           </div>
         </main>
@@ -542,6 +779,13 @@ export default function TeacherDashboard() {
             >
               <Eye className="w-5 h-5" />
               View Results
+            </button>
+            <button
+              onClick={() => setActiveTab('download-results')}
+              className="flex items-center gap-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-[1.03] hover:shadow-lg shadow-purple-200"
+            >
+              <Download className="w-5 h-5" />
+              Download Results
             </button>
           </div>
         </div>
@@ -810,7 +1054,7 @@ export default function TeacherDashboard() {
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span className={"inline-block px-3 py-1 rounded-full text-xs font-bold " + ((r.percentage || 0) >= (r.exam?.passMark || 50) ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200')}>
-                              {r.percentage}%
+                              {r.percentage ?? 0}%
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-gray-500">{r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : ''}</td>

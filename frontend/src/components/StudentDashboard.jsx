@@ -1331,7 +1331,7 @@ export default function StudentDashboard() {
                         </div>
                       </div>
                       <span className={'text-lg font-extrabold ' + (passed ? 'text-green-600' : 'text-red-500')}>
-                        {r.percentage}%
+                        {r.percentage ?? 0}%
                       </span>
                     </div>
                     <p className="text-xs text-gray-300 mt-2">
