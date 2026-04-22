@@ -1883,18 +1883,6 @@ export default function AdminPanel() {
             {resLoading ? 'Generating...' : '\u2B07 Download PDF'}
           </button>
 
-          {/* Info */}
-          <div style={{ marginTop: 16, padding: 14, background: '#eef2ff', borderRadius: 10, border: '1px solid #c7d2fe', fontSize: 12, color: '#4338ca' }}>
-            <p style={{ fontWeight: 600, marginBottom: 4 }}>About the PDF:</p>
-            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11.5, lineHeight: 1.6, color: '#4338ca' }}>
-              <li>School name, motto and RESCO CBT watermark on every page</li>
-              <li>Student name, admission number, score, grade, pass/fail status</li>
-              <li>Official computer-generated document stamp (non-editable)</li>
-              <li>Principal &amp; teacher signature lines</li>
-              <li>Summary statistics: total, passed, failed, average, highest, lowest</li>
-            </ul>
-          </div>
-
           {/* Preview */}
           {resPreview && (
             <div style={{ marginTop: 20, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>

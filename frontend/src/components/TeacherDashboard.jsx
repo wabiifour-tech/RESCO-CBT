@@ -595,23 +595,6 @@ export default function TeacherDashboard() {
                 {dlLoading ? 'Generating...' : 'Download PDF'}
               </button>
 
-              {/* Info Text */}
-              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-indigo-700">
-                    <p className="font-semibold">About the PDF:</p>
-                    <ul className="list-disc list-inside mt-1 space-y-0.5 text-indigo-600 text-xs">
-                      <li>Includes school name, motto and logo watermark</li>
-                      <li>Shows each student's name, admission number, score, grade and status</li>
-                      <li>Has official stamp declaring it as a valid computer-generated document</li>
-                      <li>Includes principal and teacher signature lines</li>
-                      <li>Includes summary statistics (total, passed, failed, average, highest, lowest)</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
               {/* Preview */}
               {dlPreview && (
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
