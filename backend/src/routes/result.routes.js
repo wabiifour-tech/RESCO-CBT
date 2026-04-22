@@ -240,7 +240,7 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
     }
 
     // MANUAL mode: hide all scores and answers from students
-    if (result.exam.resultVisibility === 'MANUAL') {
+    if (!result.exam || result.exam.resultVisibility === 'MANUAL') {
       return res.status(200).json({
         success: true,
         result: {
@@ -255,10 +255,10 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
     }
 
     // AFTER_CLOSE mode: hide details if exam hasn't closed yet
-    if (result.exam.resultVisibility === 'AFTER_CLOSE') {
-      const endDate = result.exam.endDate;
+    if (result.exam?.resultVisibility === 'AFTER_CLOSE') {
+      const endDate = result.exam?.endDate;
       const hasEnd = endDate && !isNaN(new Date(endDate).getTime());
-      const passMark = result.exam.passMark || 50;
+      const passMark = result.exam?.passMark || 50;
       if (hasEnd && new Date(endDate) > new Date()) {
         return res.status(200).json({
           success: true,
@@ -267,7 +267,7 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
             score: result.score,
             totalMarks: result.totalMarks,
             percentage: result.percentage,
-            passed: result.percentage >= passMark,
+            passed: (result.percentage || 0) >= passMark,
             submittedAt: result.submittedAt,
             examStartTime: result.examStartTime,
             examEndTime: result.examEndTime,
@@ -451,11 +451,11 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
     if (format === 'csv') {
       const filename = `${exam.title.replace(/[^a-zA-Z0-9]/g, '_')}_results`;
       const headers = ['Admission No', 'First Name', 'Last Name', 'Class', 'Score', 'Total Marks', 'Percentage', 'Time Spent (min)', 'Exam Start Time', 'Exam End Time', 'Submitted At'];
-      const rows = validResults.map(r => [
-        r.student.admissionNo,
-        r.student.firstName,
-        r.student.lastName,
-        r.student.className,
+      const rows = results.map(r => [
+        r.student?.admissionNo || 'N/A',
+        r.student?.firstName || 'Unknown',
+        r.student?.lastName || 'Unknown',
+        r.student?.className || 'N/A',
         r.score,
         r.totalMarks,
         `${r.percentage}%`,
@@ -512,7 +512,7 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
       doc.addPage();
       drawWatermark();
 
-      const studentName = `${result.student.firstName} ${result.student.lastName}`;
+      const studentName = result.student ? `${result.student.firstName} ${result.student.lastName}` : 'Unknown Student';
       const examDate = result.submittedAt.toLocaleDateString('en-NG', {
         year: 'numeric', month: 'long', day: 'numeric',
       });
@@ -552,8 +552,8 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
       doc.fontSize(10).font('Helvetica-Bold').fillColor('#4c1d95');
       const fields = [
         ['Student Name:', studentName],
-        ['Admission No:', result.student.admissionNo],
-        ['Class:', result.student.className],
+        ['Admission No:', result.student?.admissionNo || 'N/A'],
+        ['Class:', result.student?.className || 'N/A'],
         ['Subject:', subject],
         ['Date:', examDate],
         ['Start Time:', startTimeStr],

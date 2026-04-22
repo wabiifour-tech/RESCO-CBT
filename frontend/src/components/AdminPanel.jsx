@@ -203,7 +203,7 @@ export default function AdminPanel() {
     setLoading(true);
     try {
       const res = await api.get('/admin/questions/' + examId);
-      setSelectedExamInfo(res.data.exam);
+      setSelectedExamInfo(res.data.exam || null);
       setExamQuestions(res.data.questions || []);
     } catch (err) {
       toast.error('Failed to load questions');
@@ -561,7 +561,7 @@ export default function AdminPanel() {
             </div>
             <h1 style={{ fontSize: 28, fontWeight: 800, margin: '0 0 6px 0' }}>Admin Dashboard</h1>
             <p style={{ fontSize: 15, opacity: 0.85, margin: 0 }}>
-              Signed in as <span style={{ fontWeight: 600, textDecoration: 'underline' }}>{user.email}</span>
+              Signed in as <span style={{ fontWeight: 600, textDecoration: 'underline' }}>{user?.email || 'Admin'}</span>
             </p>
           </div>
         </div>
@@ -958,7 +958,7 @@ export default function AdminPanel() {
               </div>
             </div>
           </div>
-          {passFail.total && (
+          {passFail.total > 0 && (
             <p style={{ fontSize: 13, color: '#64748b', marginTop: 14, marginBlockStart: 14, marginBlockEnd: 0 }}>
               Total attempts: <strong>{passFail.total}</strong> &middot; Pass rate:{' '}
               <strong>{(passFail.passed / passFail.total * 100).toFixed(1)}%</strong>
@@ -1375,7 +1375,7 @@ export default function AdminPanel() {
             <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '2px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: 0 }}>{selectedExamInfo.title}</h3>
-                <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0 0' }}>{selectedExamInfo.subject} - {selectedExamInfo.className} &middot; {examQuestions.length} question(s)</p>
+                <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0 0' }}>{selectedExamInfo.subject || 'N/A'} - {selectedExamInfo.className || 'N/A'} &middot; {examQuestions.length} question(s)</p>
               </div>
               <a href="#" onClick={(e) => { e.preventDefault(); downloadCSVTemplate(); }} style={{ fontSize: 13, color: '#6366f1', fontWeight: 600, textDecoration: 'none' }}>Download CSV Template</a>
             </div>

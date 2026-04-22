@@ -444,7 +444,7 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
     // --- Validate answer if provided ---
     if (updateData.answer !== undefined) {
       const validAnswers = ['A', 'B', 'C', 'D'];
-      if (!validAnswers.includes(updateData.answer.toUpperCase())) {
+      if (typeof updateData.answer !== 'string' || !validAnswers.includes(updateData.answer.toUpperCase())) {
         return res.status(400).json({
           success: false,
           message: 'answer must be one of A, B, C, D.',

@@ -219,7 +219,7 @@ export default function LoginPage() {
         iconTheme: { primary: '#fbbf24', secondary: '#fff' },
       });
 
-      const rolePath = data.user.role.toLowerCase();
+      const rolePath = (data.user.role || 'STUDENT').toLowerCase();
       navigate('/' + rolePath);
     } catch (err) {
       const msg = err.response?.data?.message || 'Login failed. Please check your credentials.';

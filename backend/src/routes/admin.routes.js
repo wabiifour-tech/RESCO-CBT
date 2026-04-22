@@ -171,10 +171,10 @@ router.get('/teachers', async (req, res) => {
         firstName: t.firstName,
         lastName: t.lastName,
         username: t.username,
-        email: t.user.email,
+        email: t.user?.email || 'N/A',
         status: t.status,
         subjects: (() => { try { return JSON.parse(t.subjects || '[]'); } catch (_) { return []; } })(),
-        createdAt: t.user.createdAt,
+        createdAt: t.user?.createdAt || null,
         examCount: t._count.exams,
       })),
       pagination: {
@@ -254,7 +254,7 @@ router.post('/teachers/create', async (req, res) => {
       lastName: teacher.lastName,
       username: teacher.username,
       status: teacher.status,
-      createdAt: teacher.user.createdAt,
+      createdAt: teacher.user?.createdAt || null,
       message: 'Teacher created successfully',
     });
   } catch (error) {
@@ -295,7 +295,7 @@ router.patch('/teachers/:id/approve', async (req, res) => {
       id: updated.id,
       firstName: updated.firstName,
       lastName: updated.lastName,
-      email: updated.user.email,
+      email: updated.user?.email || 'N/A',
       status: updated.status,
       message: 'Teacher approved successfully',
     });
@@ -337,7 +337,7 @@ router.patch('/teachers/:id/reject', async (req, res) => {
       id: updated.id,
       firstName: updated.firstName,
       lastName: updated.lastName,
-      email: updated.user.email,
+      email: updated.user?.email || 'N/A',
       status: updated.status,
       message: 'Teacher rejected successfully',
     });
@@ -447,8 +447,8 @@ router.get('/students', async (req, res) => {
         firstName: s.firstName,
         lastName: s.lastName,
         className: s.className,
-        email: s.user.email,
-        createdAt: s.user.createdAt,
+        email: s.user?.email || 'N/A',
+        createdAt: s.user?.createdAt || null,
         resultCount: s._count.results,
       })),
       pagination: {
@@ -536,12 +536,12 @@ router.post('/students/create', async (req, res) => {
 
     res.status(201).json({
       id: student.id,
-      email: student.user.email,
+      email: student.user?.email || 'N/A',
       admissionNo: student.admissionNo,
       firstName: student.firstName,
       lastName: student.lastName,
       className: student.className,
-      createdAt: student.user.createdAt,
+      createdAt: student.user?.createdAt || null,
       message: 'Student created successfully',
     });
   } catch (error) {
@@ -648,10 +648,12 @@ router.post('/students/bulk', async (req, res) => {
 
     if (duplicateEmails.length > 0) {
       for (const dup of [...new Set(duplicateEmails)]) {
-        const row = validStudents.findIndex((s) => s.email === dup) + 1;
+        const matchIdx = validStudents.findIndex((s) => s.email === dup);
+        if (matchIdx === -1) continue;
+        const row = matchIdx + 1;
         errors.push({
           row,
-          admissionNo: validStudents[row - 1].admissionNo,
+          admissionNo: validStudents[matchIdx].admissionNo,
           error: `Duplicate email in batch: ${dup}`,
         });
       }

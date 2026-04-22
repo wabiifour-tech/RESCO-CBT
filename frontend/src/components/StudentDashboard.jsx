@@ -248,6 +248,11 @@ export default function StudentDashboard() {
       const qs = res.data.questions;
       const examStartTime = res.data.examStartTime;
 
+      if (!exam || !qs || !Array.isArray(qs) || qs.length === 0) {
+        toast.error('Invalid exam data received');
+        return;
+      }
+
       setExamDetail(exam);
       examDetailRef.current = exam;
       setQuestions(qs);
@@ -274,8 +279,8 @@ export default function StudentDashboard() {
     try {
       const elapsed = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0;
       // Use refs to always get the latest values (prevents stale closure in timer auto-submit)
-      const currentQuestions = questionsRef.current;
-      const currentAnswers = answersRef.current;
+      const currentQuestions = questionsRef.current || [];
+      const currentAnswers = answersRef.current || {};
       const formattedAnswers = currentQuestions.map(function (q) {
         return { questionId: q.id, selected: currentAnswers[q.id] || null };
       });

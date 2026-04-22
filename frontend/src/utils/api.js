@@ -10,8 +10,12 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('resco_token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  try {
+    const token = localStorage.getItem('resco_token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+  } catch (e) {
+    // localStorage unavailable (private browsing)
+  }
   return config;
 });
 
@@ -19,8 +23,10 @@ api.interceptors.response.use(
   (res) => res,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('resco_token');
-      localStorage.removeItem('resco_user');
+      try {
+        localStorage.removeItem('resco_token');
+        localStorage.removeItem('resco_user');
+      } catch (e) { /* ignore */ }
       if (window.location.pathname !== '/') window.location.href = '/';
     }
     return Promise.reject(error);

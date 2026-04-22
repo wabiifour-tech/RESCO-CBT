@@ -48,7 +48,7 @@ async function healSchema(prisma) {
       const taExists = await prisma.$queryRawUnsafe(`
         SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'teacher_assignments') as exists;
       `);
-      if (taExists[0].exists) {
+      if (taExists.length > 0 && taExists[0].exists) {
         // Safety: copy any remaining data
         try {
           await prisma.$executeRawUnsafe(`

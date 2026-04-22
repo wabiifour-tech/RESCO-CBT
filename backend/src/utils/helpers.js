@@ -48,6 +48,7 @@ const calculateScore = (answers, questions) => {
   }
 
   for (const answer of answers) {
+    if (!answer || !answer.questionId) continue;
     const question = questionMap.get(answer.questionId);
 
     if (!question) {
@@ -57,6 +58,8 @@ const calculateScore = (answers, questions) => {
     const questionMarks = question.marks || 1;
 
     if (
+      typeof answer.selected === 'string' &&
+      typeof question.answer === 'string' &&
       answer.selected &&
       question.answer &&
       answer.selected.toUpperCase() === question.answer.toUpperCase()

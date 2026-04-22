@@ -360,11 +360,11 @@ export default function TeacherDashboard() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="font-bold text-sm text-gray-800">{r.percentage}%</span>
+                        <span className="font-bold text-sm text-gray-800">{r.percentage ?? 0}%</span>
                         <div className="w-16 bg-gray-200 rounded-full h-1.5 mt-1">
                           <div
                             className={'h-1.5 rounded-full ' + (r.percentage >= 50 ? 'bg-green-500' : 'bg-red-400')}
-                            style={{ width: Math.min(r.percentage, 100) + '%' }}
+                            style={{ width: Math.min(r.percentage ?? 0, 100) + '%' }}
                           />
                         </div>
                       </div>
@@ -394,13 +394,13 @@ export default function TeacherDashboard() {
                           {qs.question}
                         </p>
                         <span className={'text-xs font-bold px-2 py-0.5 rounded-full ' + (qs.correctRate >= 70 ? 'bg-green-100 text-green-700' : qs.correctRate >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')}>
-                          {qs.correctRate}%
+                          {qs.correctRate ?? 0}%
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2.5">
                         <div
                           className={'h-2.5 rounded-full transition-all duration-500 ' + (qs.correctRate >= 70 ? 'bg-green-500' : qs.correctRate >= 40 ? 'bg-yellow-500' : 'bg-red-500')}
-                          style={{ width: qs.correctRate + '%' }}
+                          style={{ width: (qs.correctRate ?? 0) + '%' }}
                         />
                       </div>
                       <p className="text-xs text-gray-400 mt-1.5">
@@ -911,7 +911,7 @@ export default function TeacherDashboard() {
                   <input
                     type="number"
                     value={createForm.duration}
-                    onChange={e => setCreateForm({ ...createForm, duration: parseInt(e.target.value) })}
+                    onChange={e => setCreateForm({ ...createForm, duration: parseInt(e.target.value) || 30 })}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                     min="5"
                     required
@@ -924,7 +924,7 @@ export default function TeacherDashboard() {
                   <input
                     type="number"
                     value={createForm.totalMarks}
-                    onChange={e => setCreateForm({ ...createForm, totalMarks: parseInt(e.target.value) })}
+                    onChange={e => setCreateForm({ ...createForm, totalMarks: parseInt(e.target.value) || 50 })}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                     min="1"
                     required
@@ -935,7 +935,7 @@ export default function TeacherDashboard() {
                   <input
                     type="number"
                     value={createForm.passMark}
-                    onChange={e => setCreateForm({ ...createForm, passMark: parseInt(e.target.value) })}
+                    onChange={e => setCreateForm({ ...createForm, passMark: parseInt(e.target.value) || 25 })}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                     min="1"
                     required

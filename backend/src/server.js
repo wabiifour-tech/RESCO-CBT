@@ -193,12 +193,17 @@ async function connectWithRetry(maxRetries = 20, baseDelayMs = 2000) {
 }
 
 const server = app.listen(PORT, async () => {
-  await connectWithRetry();
-  // ── CRITICAL: Heal database schema BEFORE serving any requests ──
-  // This adds missing columns (class_name, subject, teacher_id) to exams table
-  await healSchema(prisma);
-  console.log(`🚀 RESCO CBT Server running on port ${PORT} [${process.env.NODE_ENV || 'development'} mode]`);
-  console.log(`   Health check: http://localhost:${PORT}/api/health`);
+  try {
+    await connectWithRetry();
+    // ── CRITICAL: Heal database schema BEFORE serving any requests ──
+    // This adds missing columns (class_name, subject, teacher_id) to exams table
+    await healSchema(prisma);
+    console.log(`🚀 RESCO CBT Server running on port ${PORT} [${process.env.NODE_ENV || 'development'} mode]`);
+    console.log(`   Health check: http://localhost:${PORT}/api/health`);
+  } catch (startupErr) {
+    console.error('❌ Server startup failed:', startupErr);
+    process.exit(1);
+  }
 });
 
 // Graceful shutdown handlers

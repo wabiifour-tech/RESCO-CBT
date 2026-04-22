@@ -6,14 +6,22 @@ const useAuthStore = create((set) => ({
   isAuthenticated: false,
 
   setUser: (user, token) => {
-    localStorage.setItem('resco_user', JSON.stringify(user));
-    localStorage.setItem('resco_token', token);
+    try {
+      localStorage.setItem('resco_user', JSON.stringify(user));
+      localStorage.setItem('resco_token', token);
+    } catch (e) {
+      console.warn('Storage write failed:', e);
+    }
     set({ user, token, isAuthenticated: true });
   },
 
   logout: () => {
-    localStorage.removeItem('resco_user');
-    localStorage.removeItem('resco_token');
+    try {
+      localStorage.removeItem('resco_user');
+      localStorage.removeItem('resco_token');
+    } catch (e) {
+      console.warn('Storage clear failed:', e);
+    }
     set({ user: null, token: null, isAuthenticated: false });
   },
 
