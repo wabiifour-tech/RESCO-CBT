@@ -1,32 +1,28 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/roleMiddleware');
 
 // ============================================================
-// Multer configuration for CSV uploads (memory storage)
+// Multer configuration for file uploads (CSV, PDF, DOCX, TXT)
 // ============================================================
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5 MB max
+    fileSize: 10 * 1024 * 1024, // 10 MB max
   },
   fileFilter: (req, file, cb) => {
-    const allowedMimes = [
-      'text/csv',
-      'application/vnd.ms-excel',
-      'application/csv',
-    ];
-    const allowedExtensions = ['.csv'];
-
+    const allowedExtensions = ['.csv', '.pdf', '.docx', '.txt'];
     const originalName = file.originalname || '';
     const ext = originalName.toLowerCase().slice(originalName.lastIndexOf('.'));
-    if (allowedMimes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
+    if (allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV files are allowed.'));
+      cb(new Error('Only CSV, PDF, DOCX, and TXT files are allowed. Old .doc format is not supported.'));
     }
   },
 });
@@ -144,6 +140,110 @@ function parseCSV(buffer) {
 }
 
 // ============================================================
+// PDF/DOCX/TXT Parsers
+// ============================================================
+async function parsePDF(buffer) {
+  try {
+    const data = await pdfParse(buffer);
+    return parseTextQuestions(data.text);
+  } catch (err) {
+    return { error: 'Failed to parse PDF: ' + err.message };
+  }
+}
+
+async function parseDOCX(buffer) {
+  try {
+    const result = await mammoth.extractRawText({ buffer });
+    return parseTextQuestions(result.value);
+  } catch (err) {
+    return { error: 'Failed to parse DOCX: ' + err.message };
+  }
+}
+
+function parseTXT(buffer) {
+  return parseTextQuestions(buffer.toString('utf-8'));
+}
+
+// ============================================================
+// Unified text question parser (PDF, DOCX, TXT)
+// Supports:
+//   1) Numbered questions with A/B/C/D options and answer key
+//   2) Delimited: question | optionA | optionB | optionC | optionD | answer | marks
+// ============================================================
+function parseTextQuestions(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+  if (lines.length === 0) return { error: 'No content found in the file.' };
+
+  const questions = [];
+  let current = null;
+
+  // Detect format: if first line has pipes or tabs, treat as delimited
+  const firstLine = lines[0];
+  const isDelimited = (firstLine.includes('|') && (firstLine.match(/\|/g) || []).length >= 5) ||
+                       (firstLine.includes('\t') && (firstLine.match(/\t/g) || []).length >= 5);
+
+  if (isDelimited) {
+    let startIdx = 0;
+    const headerCheck = firstLine.toLowerCase();
+    if (headerCheck.includes('question') && (headerCheck.includes('option') || headerCheck.includes('answer'))) {
+      startIdx = 1;
+    }
+    for (let i = startIdx; i < lines.length; i++) {
+      const sep = lines[i].includes('|') ? '|' : '\t';
+      const parts = lines[i].split(sep).map(p => p.trim());
+      if (parts.length >= 6 && parts[0] && parts[1] && parts[2] && parts[3] && parts[4] && parts[5]) {
+        questions.push({
+          question: parts[0], optionA: parts[1], optionB: parts[2],
+          optionC: parts[3], optionD: parts[4], answer: parts[5].toUpperCase(),
+          marks: parts.length >= 7 ? (parseInt(parts[6]) || 1) : 1, _rawIndex: i + 1,
+        });
+      }
+    }
+    return questions.length > 0 ? { rows: questions } : { error: 'Could not parse any questions from delimited file.' };
+  }
+
+  // Numbered question format
+  const qPattern = /^(\d+)[.\)]\s*(.+)/;
+  const optPattern = /^\s*([A-Da-d])[.\):]\s*(.+)/;
+  const ansPattern = /^\s*(?:answer|ans|correct)[.\s:]+\s*([A-Da-d])/i;
+  const marksPattern = /^\s*(?:mark|score|point)[s]?[.\s:]+\s*(\d+)/i;
+
+  for (const line of lines) {
+    const qMatch = line.match(qPattern);
+    if (qMatch) {
+      if (current && current.question) questions.push(current);
+      current = { question: qMatch[2].trim(), optionA: '', optionB: '', optionC: '', optionD: '', answer: '', marks: 1, _rawIndex: parseInt(qMatch[1]) };
+      const inlineOpts = line.substring(qMatch[0].length).match(/([A-Da-d])[.\):]\s*([^A-D]*?)(?=\s+[A-D][.\):]|\s+Ans|$)/gi);
+      if (inlineOpts && inlineOpts.length >= 4) {
+        const keys = ['optionA', 'optionB', 'optionC', 'optionD'];
+        inlineOpts.forEach((opt, idx) => {
+          if (idx < 4) {
+            const m = opt.match(/([A-Da-d])[.\):]\s*(.*)/);
+            if (m) current[keys[idx]] = m[2].trim();
+          }
+        });
+      }
+      continue;
+    }
+    if (!current) continue;
+
+    const optMatch = line.match(optPattern);
+    if (optMatch) {
+      const key = 'option' + optMatch[1].toUpperCase();
+      if (current.hasOwnProperty(key)) current[key] = optMatch[2].trim();
+      continue;
+    }
+    const ansMatch = line.match(ansPattern);
+    if (ansMatch) { current.answer = ansMatch[1].toUpperCase(); continue; }
+    const marksMatch = line.match(marksPattern);
+    if (marksMatch) { current.marks = parseInt(marksMatch[1]) || 1; continue; }
+  }
+  if (current && current.question) questions.push(current);
+
+  return questions.length > 0 ? { rows: questions } : { error: 'Could not parse any questions from the file. Expected numbered questions (1. Question text) with options A-D and an Answer line.' };
+}
+
+// ============================================================
 // POST /manual - Add Questions Manually
 // ============================================================
 router.post('/manual', authenticate, requireRole('TEACHER'), async (req, res) => {
@@ -213,14 +313,16 @@ router.post('/manual', authenticate, requireRole('TEACHER'), async (req, res) =>
       });
     }
 
-    // --- Create questions in a transaction ---
-    const created = await prisma.$transaction(
-      validQuestions.map((q) =>
-        prisma.examQuestion.create({
-          data: q,
-        })
-      )
-    );
+    // --- Create questions in batched transactions (50 per batch) ---
+    let created = [];
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < validQuestions.length; i += BATCH_SIZE) {
+      const batch = validQuestions.slice(i, i + BATCH_SIZE);
+      const batchCreated = await prisma.$transaction(
+        batch.map((q) => prisma.examQuestion.create({ data: q }))
+      );
+      created = created.concat(batchCreated);
+    }
 
     return res.status(201).json({
       success: true,
@@ -246,7 +348,7 @@ router.post('/manual', authenticate, requireRole('TEACHER'), async (req, res) =>
 });
 
 // ============================================================
-// POST /upload - Upload Questions via CSV
+// POST /upload - Upload Questions (CSV, PDF, DOCX, TXT)
 // ============================================================
 router.post('/upload', authenticate, requireRole('TEACHER'), upload.single('file'), async (req, res) => {
   try {
@@ -263,7 +365,7 @@ router.post('/upload', authenticate, requireRole('TEACHER'), upload.single('file
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'No file uploaded. Please upload a CSV file.',
+        message: 'No file uploaded.',
       });
     }
 
@@ -284,8 +386,25 @@ router.post('/upload', authenticate, requireRole('TEACHER'), upload.single('file
       });
     }
 
-    // --- Parse CSV ---
-    const parsed = parseCSV(req.file.buffer);
+    // --- Parse file based on extension ---
+    const originalName = req.file.originalname || '';
+    const ext = originalName.toLowerCase().slice(originalName.lastIndexOf('.'));
+    let parsed;
+
+    if (ext === '.csv') {
+      parsed = parseCSV(req.file.buffer);
+    } else if (ext === '.pdf') {
+      parsed = await parsePDF(req.file.buffer);
+    } else if (ext === '.docx') {
+      parsed = await parseDOCX(req.file.buffer);
+    } else if (ext === '.txt') {
+      parsed = parseTXT(req.file.buffer);
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Unsupported file format. Use CSV, PDF, DOCX, or TXT.',
+      });
+    }
 
     if (parsed.error) {
       return res.status(400).json({
@@ -299,7 +418,7 @@ router.post('/upload', authenticate, requireRole('TEACHER'), upload.single('file
     if (!rows || rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'CSV file contains no data rows.',
+        message: 'No questions could be parsed from the file.',
       });
     }
 
@@ -324,16 +443,17 @@ router.post('/upload', authenticate, requireRole('TEACHER'), upload.single('file
       }
     }
 
-    // --- Create valid questions in a transaction ---
+    // --- Create valid questions in batched transactions (50 per batch) ---
     let created = [];
     if (validQuestions.length > 0) {
-      created = await prisma.$transaction(
-        validQuestions.map((q) =>
-          prisma.examQuestion.create({
-            data: q,
-          })
-        )
-      );
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < validQuestions.length; i += BATCH_SIZE) {
+        const batch = validQuestions.slice(i, i + BATCH_SIZE);
+        const batchCreated = await prisma.$transaction(
+          batch.map((q) => prisma.examQuestion.create({ data: q }))
+        );
+        created = created.concat(batchCreated);
+      }
     }
 
     return res.status(201).json({
@@ -347,7 +467,7 @@ router.post('/upload', authenticate, requireRole('TEACHER'), upload.single('file
   } catch (error) {
     console.error('Error in POST /questions/upload:', error);
 
-    if (error.message === 'Only CSV files are allowed.') {
+    if (error.message && error.message.includes('files are allowed')) {
       return res.status(400).json({
         success: false,
         message: error.message,

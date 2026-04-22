@@ -17,7 +17,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   fileFilter: (req, file, cb) => {
-    const allowedExtensions = ['.csv', '.pdf', '.docx', '.doc', '.txt'];
+    const allowedExtensions = ['.csv', '.pdf', '.docx', '.txt'];
     const originalName = file.originalname || '';
     const ext = originalName.toLowerCase().slice(originalName.lastIndexOf('.'));
     if (allowedExtensions.includes(ext)) cb(null, true);
@@ -1472,8 +1472,7 @@ router.post('/questions/upload', upload.single('file'), async (req, res) => {
       parsed = parseCSV(req.file.buffer);
     } else if (ext === '.pdf') {
       parsed = await parsePDF(req.file.buffer);
-    } else if (ext === '.docx' || ext === '.doc') {
-      if (ext === '.doc') return res.status(400).json({ error: 'Old .doc format is not supported. Please save as .docx or .pdf.' });
+    } else if (ext === '.docx') {
       parsed = await parseDOCX(req.file.buffer);
     } else if (ext === '.txt') {
       parsed = parseTXT(req.file.buffer);

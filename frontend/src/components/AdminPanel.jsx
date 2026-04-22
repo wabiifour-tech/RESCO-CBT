@@ -476,6 +476,27 @@ export default function AdminPanel() {
   const handleManualSubmit = async (e) => {
     e && e.preventDefault();
     if (!selectedExamId) { toast.error('Select an exam first'); return; }
+
+    const toSubmit = manualQuestions.filter(function (q) { return q.question.trim(); });
+    if (toSubmit.length === 0) { toast.error('Please fill in at least one question'); return; }
+
+    // Client-side validation
+    const errors = [];
+    for (let i = 0; i < toSubmit.length; i++) {
+      const q = toSubmit[i];
+      const row = manualQuestions.indexOf(q) + 1;
+      if (!q.optionA || !q.optionA.trim()) errors.push('Row ' + row + ': Option A required');
+      if (!q.optionB || !q.optionB.trim()) errors.push('Row ' + row + ': Option B required');
+      if (!q.optionC || !q.optionC.trim()) errors.push('Row ' + row + ': Option C required');
+      if (!q.optionD || !q.optionD.trim()) errors.push('Row ' + row + ': Option D required');
+      if (!q.answer || !['A','B','C','D'].includes(q.answer)) errors.push('Row ' + row + ': Answer must be A/B/C/D');
+      if (!q.marks || q.marks < 1) errors.push('Row ' + row + ': Marks must be >= 1');
+    }
+    if (errors.length > 0) {
+      toast.error(errors.slice(0, 3).join('; ') + (errors.length > 3 ? ' ...and ' + (errors.length - 3) + ' more' : ''));
+      return;
+    }
+
     setUploading(true);
     try {
       const filtered = manualQuestions.filter(function (q) { return q.question.trim(); });
@@ -1548,7 +1569,7 @@ export default function AdminPanel() {
                       return (
                         <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '4px 6px', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: 12 }}>{idx + 1}</td>
-                          <td style={{ padding: '4px 6px' }}><input value={q.question} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], question: e.target.value }; setManualQuestions(updated); }} placeholder="Type question..." style={{ ...inputStyle, fontSize: 12, padding: '8px 10px' }} /></td>
+                          <td style={{ padding: '4px 6px' }}><textarea value={q.question} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], question: e.target.value }; setManualQuestions(updated); }} placeholder="Type question..." rows={2} style={{ ...inputStyle, fontSize: 12, padding: '8px 10px', resize: 'vertical', minHeight: 40 }} /></td>
                           <td style={{ padding: '4px 6px' }}><input value={q.optionA} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionA: e.target.value }; setManualQuestions(updated); }} placeholder="A" style={{ ...inputStyle, fontSize: 12, padding: '8px 10px' }} /></td>
                           <td style={{ padding: '4px 6px' }}><input value={q.optionB} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionB: e.target.value }; setManualQuestions(updated); }} placeholder="B" style={{ ...inputStyle, fontSize: 12, padding: '8px 10px' }} /></td>
                           <td style={{ padding: '4px 6px' }}><input value={q.optionC} onChange={function (e) { var updated = [...manualQuestions]; updated[idx] = { ...updated[idx], optionC: e.target.value }; setManualQuestions(updated); }} placeholder="C" style={{ ...inputStyle, fontSize: 12, padding: '8px 10px' }} /></td>

@@ -189,6 +189,30 @@ export default function TeacherDashboard() {
 
   const handleAddQuestions = async (e) => {
     e.preventDefault();
+    const toSubmit = questionForm.filter(q => q.question && q.question.trim());
+
+    // Client-side validation
+    const errors = [];
+    for (let i = 0; i < toSubmit.length; i++) {
+      const q = toSubmit[i];
+      const row = questionForm.indexOf(q) + 1;
+      if (!q.optionA || !q.optionA.trim()) errors.push(`Row ${row}: Option A is required`);
+      if (!q.optionB || !q.optionB.trim()) errors.push(`Row ${row}: Option B is required`);
+      if (!q.optionC || !q.optionC.trim()) errors.push(`Row ${row}: Option C is required`);
+      if (!q.optionD || !q.optionD.trim()) errors.push(`Row ${row}: Option D is required`);
+      if (!q.answer || !['A','B','C','D'].includes(q.answer)) errors.push(`Row ${row}: Answer must be A, B, C, or D`);
+      if (!q.marks || q.marks < 1) errors.push(`Row ${row}: Marks must be at least 1`);
+    }
+
+    if (toSubmit.length === 0) {
+      toast.error('Please fill in at least one question');
+      return;
+    }
+    if (errors.length > 0) {
+      toast.error(errors.slice(0, 3).join('; ') + (errors.length > 3 ? ` ...and ${errors.length - 3} more` : ''));
+      return;
+    }
+
     try {
       await api.post('/questions/manual', {
         examId: selectedExam?.id,
@@ -211,7 +235,7 @@ export default function TeacherDashboard() {
   const handleCSVUpload = async (e) => {
     e.preventDefault();
     if (!uploadFile) {
-      toast.error('Select a CSV file');
+      toast.error('Select a file to upload');
       return;
     }
     if (!uploadExamId) {
@@ -1265,16 +1289,16 @@ export default function TeacherDashboard() {
                       <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="px-2 py-1 text-center text-gray-500 font-semibold text-xs">{i + 1}</td>
                         <td className="px-2 py-1">
-                          <input
-                            type="text"
+                          <textarea
                             value={q.question}
                             onChange={e => {
                               const updated = [...questionForm];
                               updated[i] = { ...updated[i], question: e.target.value };
                               setQuestionForm(updated);
                             }}
-                            className="input-field text-xs !py-1.5"
+                            className="input-field text-xs !py-1.5 resize-y"
                             placeholder="Type question..."
+                            rows={2}
                           />
                         </td>
                         <td className="px-2 py-1">
@@ -1401,7 +1425,7 @@ export default function TeacherDashboard() {
                   <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                     <Upload className="w-5 h-5 text-white" />
                   </div>
-                  <h2 className="text-xl font-bold text-white">Upload Questions (CSV)</h2>
+                  <h2 className="text-xl font-bold text-white">Upload Questions</h2>
                 </div>
                 <button onClick={() => setShowUpload(false)} className="text-white/70 hover:text-white transition-colors">
                   <X className="w-5 h-5" />
@@ -1426,11 +1450,11 @@ export default function TeacherDashboard() {
               </div>
               <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-green-400 transition-colors">
                 <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <input type="file" accept=".csv" onChange={e => setUploadFile(e.target.files[0])} className="hidden" id="csv-upload" />
+                <input type="file" accept=".csv,.pdf,.docx,.txt" onChange={e => setUploadFile(e.target.files[0])} className="hidden" id="csv-upload" />
                 <label htmlFor="csv-upload" className="cursor-pointer text-green-600 hover:text-green-700 text-sm font-semibold">
-                  {uploadFile ? uploadFile.name : 'Click to select CSV file'}
+                  {uploadFile ? uploadFile.name : 'Click to select file'}
                 </label>
-                <p className="text-xs text-gray-400 mt-1">CSV format: question, optionA, optionB, optionC, optionD, answer, marks</p>
+                <p className="text-xs text-gray-400 mt-1">Supported: PDF, DOCX, TXT, CSV</p>
               </div>
               <button
                 type="submit"
