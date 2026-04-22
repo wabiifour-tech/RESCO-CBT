@@ -3,6 +3,7 @@ import LoginPage from './components/LoginPage';
 import StudentDashboard from './components/StudentDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import AdminPanel from './components/AdminPanel';
+import PrincipalDashboard from './components/PrincipalDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import useAuthStore from './store/authStore';
@@ -13,10 +14,11 @@ export default function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={isAuthenticated ? <Navigate to={`/${user?.role?.toLowerCase()}`} replace /> : <LoginPage />} />
+        <Route path="/" element={isAuthenticated ? <Navigate to={`/${(user?.role || 'STUDENT').toLowerCase()}`} replace /> : <LoginPage />} />
         <Route path="/student" element={<ProtectedRoute allowedRole="STUDENT"><StudentDashboard /></ProtectedRoute>} />
         <Route path="/teacher" element={<ProtectedRoute allowedRole="TEACHER"><TeacherDashboard /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute allowedRole="ADMIN"><AdminPanel /></ProtectedRoute>} />
+        <Route path="/principal" element={<ProtectedRoute allowedRole="PRINCIPAL"><PrincipalDashboard /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <PWAInstallPrompt />

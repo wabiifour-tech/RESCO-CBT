@@ -15,6 +15,7 @@ const examRoutes = require('./routes/exam.routes');
 const questionRoutes = require('./routes/question.routes');
 const resultRoutes = require('./routes/result.routes');
 const adminRoutes = require('./routes/admin.routes');
+const principalRoutes = require('./routes/principal.routes');
 
 const app = express();
 
@@ -63,6 +64,7 @@ app.use('/api/exams', examRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/results', resultRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/principal', principalRoutes);
 
 // ========================================
 // Health Check
@@ -227,6 +229,30 @@ const server = app.listen(PORT, async () => {
 
     // ── CRITICAL: Heal database schema BEFORE serving any requests ──
     await healSchema(prisma);
+
+    // ── Auto-seed principal account if it doesn't exist ──
+    try {
+      const bcrypt = require('bcryptjs');
+      const principalEmail = process.env.PRINCIPAL_EMAIL || 'principal@resco.local';
+      const existingPrincipal = await prisma.user.findUnique({ where: { email: principalEmail } });
+      if (!existingPrincipal) {
+        const principalPass = process.env.PRINCIPAL_PASSWORD || 'principal123';
+        const hashedPw = await bcrypt.hash(principalPass, 12);
+        await prisma.user.create({
+          data: {
+            email: principalEmail,
+            password: hashedPw,
+            role: 'PRINCIPAL',
+            firstName: 'Aderonke Rachael',
+            lastName: 'Odewabi',
+          },
+        });
+        console.log('✅ Principal account auto-created: ' + principalEmail);
+      }
+    } catch (seedErr) {
+      console.warn('⚠️  Principal auto-seed skipped:', seedErr.message);
+    }
+
     console.log(`🚀 RESCO CBT Server running on port ${PORT} [${process.env.NODE_ENV || 'development'} mode]`);
     console.log(`   Health check: http://localhost:${PORT}/api/health`);
   } catch (startupErr) {

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import useAuthStore from '../store/authStore';
 import toast from 'react-hot-toast';
-import { LogOut, GraduationCap, BookOpen, Shield, Sparkles, BookOpenCheck, User, Lock, ChevronLeft, ChevronRight, MapPin, Phone, Mail, Globe, Award, Hash } from 'lucide-react';
+import { LogOut, GraduationCap, BookOpen, Shield, Sparkles, BookOpenCheck, User, Lock, ChevronLeft, ChevronRight, MapPin, Phone, Mail, Globe, Award, Hash, Crown } from 'lucide-react';
 import LiveClock from './LiveClock';
 import DailyDevotional from './DailyDevotional';
 
@@ -146,6 +146,7 @@ const roles = [
   { key: 'STUDENT', label: 'Student', icon: GraduationCap, color: 'from-violet-500 to-purple-600' },
   { key: 'TEACHER', label: 'Teacher', icon: BookOpen, color: 'from-blue-500 to-indigo-600' },
   { key: 'ADMIN', label: 'Admin', icon: Shield, color: 'from-emerald-500 to-green-600' },
+  { key: 'PRINCIPAL', label: 'Principal', icon: Crown, color: 'from-amber-500 to-yellow-600' },
 ];
 
 export default function LoginPage() {
@@ -183,7 +184,7 @@ export default function LoginPage() {
 
     try {
       let payload;
-      if (role === 'ADMIN') {
+      if (role === 'ADMIN' || role === 'PRINCIPAL') {
         payload = { email: loginField, password };
       } else if (role === 'TEACHER') {
         payload = { username: loginField, password };
@@ -235,6 +236,7 @@ export default function LoginPage() {
   const getPlaceholder = () => {
     if (role === 'STUDENT') return studentLoginMode === 'admissionNo' ? 'Enter your admission number' : 'Enter your first and last name (e.g. John Doe)';
     if (role === 'TEACHER') return 'Enter your username';
+    if (role === 'PRINCIPAL') return 'Enter principal email';
     return 'Enter admin email';
   };
 
@@ -247,6 +249,7 @@ export default function LoginPage() {
   const getFieldIcon = () => {
     if (role === 'STUDENT') return studentLoginMode === 'admissionNo' ? Hash : BookOpenCheck;
     if (role === 'TEACHER') return User;
+    if (role === 'PRINCIPAL') return Crown;
     return Shield;
   };
 
@@ -322,7 +325,7 @@ export default function LoginPage() {
             {/* Active role indicator */}
             <div className="flex items-center justify-center gap-2 mb-5">
               <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200/60">
-                {(() => { const Icon = activeRole.icon; return <><Icon className="w-4 h-4" style={{ color: role === 'STUDENT' ? '#8b5cf6' : role === 'TEACHER' ? '#3b82f6' : '#10b981' }} /><span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{role === 'STUDENT' ? 'Student Login' : role === 'TEACHER' ? 'Teacher Login' : 'Admin Login'}</span></>; })()}
+                {(() => { const Icon = activeRole.icon; const roleColor = role === 'STUDENT' ? '#8b5cf6' : role === 'TEACHER' ? '#3b82f6' : role === 'PRINCIPAL' ? '#d97706' : '#10b981'; const roleLabel = role === 'STUDENT' ? 'Student Login' : role === 'TEACHER' ? 'Teacher Login' : role === 'PRINCIPAL' ? 'Principal Login' : 'Admin Login'; return <><Icon className="w-4 h-4" style={{ color: roleColor }} /><span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{roleLabel}</span></>; })()}
               </div>
             </div>
 
@@ -355,7 +358,7 @@ export default function LoginPage() {
                 <label className="block text-sm font-bold text-gray-700 mb-1.5">{getFieldLabel()}</label>
                 <div className="relative">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><FieldIcon className="w-4 h-4" /></div>
-                  <input type={role === 'ADMIN' ? 'email' : 'text'} value={loginField} onChange={(e) => setLoginField(e.target.value)}
+                  <input type={(role === 'ADMIN' || role === 'PRINCIPAL') ? 'email' : 'text'} value={loginField} onChange={(e) => setLoginField(e.target.value)}
                     className="input-field pl-10" placeholder={getPlaceholder()} required autoComplete="off" />
                 </div>
               </div>
@@ -381,6 +384,7 @@ export default function LoginPage() {
                     {role === 'STUDENT' && <GraduationCap className="w-5 h-5" />}
                     {role === 'TEACHER' && <BookOpen className="w-5 h-5" />}
                     {role === 'ADMIN' && <Shield className="w-5 h-5" />}
+                    {role === 'PRINCIPAL' && <Crown className="w-5 h-5" />}
                     Sign In
                   </span>
                 )}

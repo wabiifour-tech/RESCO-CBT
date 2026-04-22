@@ -99,6 +99,24 @@ async function seed() {
   });
   console.log('Sample student created: full name=John Okafor, password=student123');
 
+  // ── Principal account ──
+  const principalEmail = process.env.PRINCIPAL_EMAIL || 'principal@resco.local';
+  const principalPass = process.env.PRINCIPAL_PASSWORD || 'principal123';
+  const principalPw = await bcrypt.hash(principalPass, 10);
+
+  await prisma.user.upsert({
+    where: { email: principalEmail },
+    update: {},
+    create: {
+      email: principalEmail,
+      password: principalPw,
+      role: 'PRINCIPAL',
+      firstName: 'Aderonke Rachael',
+      lastName: 'Odewabi',
+    },
+  });
+  console.log('Principal account created: ' + principalEmail + ' (password: ' + principalPass + ')');
+
   console.log('Database seeding complete.');
 
   await prisma.$disconnect();

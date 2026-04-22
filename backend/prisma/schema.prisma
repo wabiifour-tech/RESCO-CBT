@@ -12,6 +12,8 @@ model User {
   email     String   @unique
   password  String
   role      String   @default("STUDENT")
+  firstName String?  @map("first_name")
+  lastName  String?  @map("last_name")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

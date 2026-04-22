@@ -78,7 +78,7 @@ router.post('/login', async (req, res) => {
     } else {
       return res.status(400).json({
         success: false,
-        message: 'Please provide email (admin), username (teacher), or full name (student).',
+        message: 'Please provide email (admin/principal), username (teacher), or full name (student).',
       });
     }
 
@@ -119,7 +119,7 @@ router.post('/login', async (req, res) => {
     );
 
     // Build profile object depending on role
-    const profile = { id: user.id, email: user.email, role: user.role };
+    const profile = { id: user.id, email: user.email, role: user.role, firstName: user.firstName, lastName: user.lastName };
 
     if (user.student) {
       profile.student = {
@@ -248,6 +248,8 @@ router.get('/me', authenticate, async (req, res) => {
       id: user.id,
       email: user.email,
       role: user.role,
+      firstName: user.firstName,
+      lastName: user.lastName,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
