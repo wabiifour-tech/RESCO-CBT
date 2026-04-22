@@ -375,7 +375,9 @@ export default function PrincipalDashboard() {
     setQuestionsLoading(true);
     try {
       const res = await api.get(`/questions/${examId}`);
-      setQuestionsList(res.data.questions || res.data || []);
+      // API returns { success: true, data: { exam: {...}, questions: [...] } }
+      const qData = res.data?.data?.questions || res.data?.questions || [];
+      setQuestionsList(Array.isArray(qData) ? qData : []);
     } catch (err) {
       toast.error('Failed to load questions');
       setQuestionsList([]);
