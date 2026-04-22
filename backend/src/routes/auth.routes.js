@@ -89,11 +89,26 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    // Support both bcrypt and plaintext password comparison
+    let isMatch = false;
+    const isBcryptHash = user.password.startsWith('$2');
+    if (isBcryptHash) {
+      isMatch = await bcrypt.compare(password, user.password);
+    } else {
+      isMatch = password === user.password;
+    }
     if (!isMatch) {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials.',
+      });
+    }
+
+    // If password was bcrypt-hashed, migrate to plaintext for faster future logins
+    if (isBcryptHash) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { password: password },
       });
     }
 
@@ -189,7 +204,13 @@ router.post('/change-password', authenticate, async (req, res) => {
       });
     }
 
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    // Support both bcrypt and plaintext password comparison
+    let isMatch = false;
+    if (user.password.startsWith('$2')) {
+      isMatch = await bcrypt.compare(currentPassword, user.password);
+    } else {
+      isMatch = currentPassword === user.password;
+    }
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -197,7 +218,7 @@ router.post('/change-password', authenticate, async (req, res) => {
       });
     }
 
-    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    const isSamePassword = newPassword === user.password;
     if (isSamePassword) {
       return res.status(400).json({
         success: false,
@@ -205,11 +226,10 @@ router.post('/change-password', authenticate, async (req, res) => {
       });
     }
 
-    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-
+    // Store new password as plaintext
     await prisma.user.update({
       where: { id: userId },
-      data: { password: hashedNewPassword },
+      data: { password: newPassword },
     });
 
     return res.status(200).json({

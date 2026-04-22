@@ -126,3 +126,11 @@ model ResultAnswer {
 
   @@map("result_answers")
 }
+
+model Settings {
+  id    String @id @default("general")
+  key   String @unique
+  value String
+
+  @@map("settings")
+}

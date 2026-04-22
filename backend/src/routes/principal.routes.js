@@ -1,10 +1,13 @@
 const express = require('express');
+const multer = require('multer');
 const prisma = require('../config/database');
 const bcrypt = require('bcryptjs');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/roleMiddleware');
 
 const router = express.Router();
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // All principal routes require authentication and PRINCIPAL role
 router.use(authenticate, requireRole('PRINCIPAL'));
@@ -779,10 +782,9 @@ router.post('/teachers/create', async (req, res) => {
       return res.status(409).json({ success: false, message: 'A teacher with this username already exists' });
     }
     const generatedEmail = `${trimmedUsername}@resco.local`;
-    const hashedPassword = await bcrypt.hash(password, 12);
     const teacher = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { email: generatedEmail, password: hashedPassword, role: 'TEACHER' },
+        data: { email: generatedEmail, password: password, role: 'TEACHER' },
       });
       return tx.teacher.create({
         data: {
@@ -873,10 +875,9 @@ router.post('/students/create', async (req, res) => {
     if (existingStudent) {
       return res.status(409).json({ success: false, message: 'A student with this admission number already exists' });
     }
-    const hashedPassword = await bcrypt.hash(password, 12);
     const student = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { email: trimmedEmail, password: hashedPassword, role: 'STUDENT' },
+        data: { email: trimmedEmail, password: password, role: 'STUDENT' },
       });
       return tx.student.create({
         data: {
@@ -975,8 +976,7 @@ router.post('/students/bulk', async (req, res) => {
     if (toCreate.length > 0) {
       await prisma.$transaction(async (tx) => {
         for (const s of toCreate) {
-          const hashedPassword = await bcrypt.hash(s.password, 12);
-          const user = await tx.user.create({ data: { email: s.email, password: hashedPassword, role: 'STUDENT' } });
+          const user = await tx.user.create({ data: { email: s.email, password: s.password, role: 'STUDENT' } });
           await tx.student.create({ data: { id: user.id, admissionNo: s.admissionNo, firstName: s.firstName, lastName: s.lastName, className: s.className } });
           createdCount++;
         }
@@ -1022,6 +1022,150 @@ router.delete('/students/:id', async (req, res) => {
   } catch (error) {
     console.error('[Principal Delete Student Error]', error);
     res.status(500).json({ success: false, message: 'Failed to delete student' });
+  }
+});
+
+// ============================================================
+// GET /users — List ALL users with passwords (for principal/admin)
+// ============================================================
+router.get('/users', async (req, res) => {
+  try {
+    const { role, search, page = '1', limit = '100' } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(500, parseInt(limit, 10) || 100));
+    const skip = (pageNum - 1) * limitNum;
+
+    const where = {};
+    if (role && ['STUDENT', 'TEACHER', 'ADMIN', 'PRINCIPAL'].includes(role.toUpperCase())) {
+      where.role = role.toUpperCase();
+    }
+    if (search) {
+      const term = search.trim();
+      where.OR = [
+        { email: { contains: term } },
+        { firstName: { contains: term } },
+        { lastName: { contains: term } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: limitNum,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          student: { select: { admissionNo: true, className: true } },
+          teacher: { select: { username: true, status: true } },
+        },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    res.json({
+      users: users.map(u => ({
+        id: u.id,
+        email: u.email,
+        role: u.role,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        password: u.password.startsWith('$2') ? '(hashed - reset to set new)' : u.password,
+        isHashed: u.password.startsWith('$2'),
+        admissionNo: u.student?.admissionNo || null,
+        className: u.student?.className || null,
+        teacherUsername: u.teacher?.username || null,
+        teacherStatus: u.teacher?.status || null,
+        createdAt: u.createdAt,
+      })),
+      pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) },
+    });
+  } catch (error) {
+    console.error('[Principal List Users Error]', error);
+    res.status(500).json({ error: 'Failed to list users' });
+  }
+});
+
+// ============================================================
+// PUT /users/:id/password — Change any user's password (principal/admin)
+// ============================================================
+router.put('/users/:id/password', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    await prisma.user.update({
+      where: { id },
+      data: { password: newPassword },  // Store as plaintext
+    });
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('[Principal Update User Password Error]', error);
+    res.status(500).json({ success: false, message: 'Failed to update password' });
+  }
+});
+
+// ============================================================
+// GET /settings/logo — Get school logo
+// ============================================================
+router.get('/settings/logo', async (req, res) => {
+  try {
+    let setting = await prisma.settings.findUnique({ where: { key: 'school_logo' } });
+    if (setting && setting.value) {
+      const matches = setting.value.match(/^data:image\/(\w+);base64,/);
+      const contentType = matches ? 'image/' + matches[1] : 'image/png';
+      const base64Data = setting.value.replace(/^data:image\/\w+;base64,/, '');
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(Buffer.from(base64Data, 'base64'));
+    }
+    return res.status(404).json({ error: 'No custom logo set' });
+  } catch (error) {
+    console.error('[Get Logo Error]', error);
+    res.status(500).json({ error: 'Failed to get logo' });
+  }
+});
+
+// ============================================================
+// POST /settings/logo — Upload school logo
+// ============================================================
+router.post('/settings/logo', upload.single('logo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ success: false, message: 'Only PNG, JPEG, GIF, and WebP images are allowed' });
+    }
+    const base64 = 'data:' + req.file.mimetype + ';base64,' + req.file.buffer.toString('base64');
+    await prisma.settings.upsert({
+      where: { key: 'school_logo' },
+      update: { value: base64 },
+      create: { key: 'school_logo', value: base64 },
+    });
+    res.json({ success: true, message: 'Logo uploaded successfully' });
+  } catch (error) {
+    console.error('[Upload Logo Error]', error);
+    res.status(500).json({ success: false, message: 'Failed to upload logo' });
+  }
+});
+
+// ============================================================
+// DELETE /settings/logo — Reset to default logo
+// ============================================================
+router.delete('/settings/logo', async (req, res) => {
+  try {
+    await prisma.settings.deleteMany({ where: { key: 'school_logo' } });
+    res.json({ success: true, message: 'Logo reset to default' });
+  } catch (error) {
+    console.error('[Delete Logo Error]', error);
+    res.status(500).json({ success: false, message: 'Failed to reset logo' });
   }
 });
 

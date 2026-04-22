@@ -245,7 +245,7 @@ const server = app.listen(PORT, async () => {
           if (oldPrincipal) {
             await prisma.user.update({
               where: { email: oldEmail },
-              data: { email: principalEmail, password: await bcrypt.hash(principalPass, 12) },
+              data: { email: principalEmail, password: principalPass },
             });
             existingPrincipal = await prisma.user.findUnique({ where: { email: principalEmail } });
             console.log('✅ Principal account migrated: ' + oldEmail + ' → ' + principalEmail);
@@ -275,11 +275,10 @@ const server = app.listen(PORT, async () => {
       }
 
       if (!existingPrincipal) {
-        const hashedPw = await bcrypt.hash(principalPass, 12);
         const newPrincipal = await prisma.user.create({
           data: {
             email: principalEmail,
-            password: hashedPw,
+            password: principalPass,
             role: 'PRINCIPAL',
             firstName: 'Aderonke Rachael',
             lastName: 'Odewabi',
@@ -289,11 +288,17 @@ const server = app.listen(PORT, async () => {
         await ensurePrincipalTeacherProfile(newPrincipal);
       } else {
         // Ensure password matches current env var (in case it was changed)
-        const isMatch = await bcrypt.compare(principalPass, existingPrincipal.password);
+        // Support both bcrypt and plaintext comparison
+        let isMatch = false;
+        if (existingPrincipal.password.startsWith('$2')) {
+          isMatch = await bcrypt.compare(principalPass, existingPrincipal.password);
+        } else {
+          isMatch = principalPass === existingPrincipal.password;
+        }
         if (!isMatch) {
           await prisma.user.update({
             where: { email: principalEmail },
-            data: { password: await bcrypt.hash(principalPass, 12) },
+            data: { password: principalPass },
           });
           console.log('✅ Principal password updated for: ' + principalEmail);
         }

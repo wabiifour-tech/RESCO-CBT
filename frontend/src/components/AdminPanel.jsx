@@ -9,7 +9,7 @@ import {
   LogOut, BookOpen, Users, UserCheck, UserX, UserPlus, BarChart3, Trash2,
   X, Eye, Shield, GraduationCap, TrendingUp, Clock, CheckCircle, XCircle,
   Search, Download, Settings, ChevronRight, Sparkles, School, Award,
-  Upload, FileQuestion, Plus, Minus, Menu, Calendar
+  Upload, FileQuestion, Plus, Minus, Menu, Calendar, Edit3
 } from 'lucide-react';
 
 // ─── Color Maps (avoid template-literal classNames) ────────────────────────────
@@ -34,6 +34,7 @@ const NAV_ITEMS = [
   { id: 'questions',   label: 'Questions',   icon: FileQuestion },
   { id: 'analytics',   label: 'Analytics',   icon: TrendingUp },
   { id: 'results',    label: 'Results',    icon: Download },
+  { id: 'users',      label: 'Users',      icon: Users },
 ];
 
 // ─── Keyframes injected once ──────────────────────────────────────────────────
@@ -142,6 +143,15 @@ export default function AdminPanel() {
   // Sidebar responsive state
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Users management
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersSearch, setUsersSearch] = useState('');
+  const [usersRoleFilter, setUsersRoleFilter] = useState('');
+  const [editPasswordModal, setEditPasswordModal] = useState(false);
+  const [editPasswordUser, setEditPasswordUser] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+
   // ─── Fetch helpers ─────────────────────────────────────────────────────────
   const fetchDashboard = useCallback(async () => {
     try {
@@ -225,6 +235,18 @@ export default function AdminPanel() {
     }
   }, []);
 
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const params = {};
+      if (usersRoleFilter) params.role = usersRoleFilter;
+      if (usersSearch) params.search = usersSearch;
+      const res = await api.get('/admin/users', { params });
+      setUsers(res.data.users || []);
+    } catch (err) { toast.error('Failed to load users'); }
+    finally { setUsersLoading(false); }
+  }, [usersRoleFilter, usersSearch]);
+
   // Load data when tab changes
   useEffect(() => {
     if (activeTab === 'dashboard') fetchDashboard();
@@ -233,7 +255,8 @@ export default function AdminPanel() {
     else if (activeTab === 'analytics') fetchAnalytics();
     else if (activeTab === 'questions') fetchDraftExams();
     else if (activeTab === 'exams') fetchAllExams();
-  }, [activeTab, fetchDashboard, fetchTeachers, fetchStudents, fetchAnalytics, fetchDraftExams, fetchAllExams]);
+    else if (activeTab === 'users') fetchUsers();
+  }, [activeTab, fetchDashboard, fetchTeachers, fetchStudents, fetchAnalytics, fetchDraftExams, fetchAllExams, fetchUsers]);
 
   // ─── Results: fetch filter options ───────────────────────────────────────────
   useEffect(() => {
@@ -538,6 +561,21 @@ export default function AdminPanel() {
     a.download = 'question_template.csv';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleEditPassword = async (e) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+    try {
+      await api.put(`/admin/users/${editPasswordUser.id}/password`, { newPassword });
+      toast.success('Password updated successfully!');
+      setEditPasswordModal(false);
+      setEditPasswordUser(null);
+      setNewPassword('');
+      fetchUsers();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update password');
+    }
   };
 
   // ─── Filtered lists ────────────────────────────────────────────────────────
@@ -2003,6 +2041,145 @@ export default function AdminPanel() {
     );
   };
 
+  // ─── Tab Content: Users (Password Management) ─────────────────────────────
+  const renderUsers = () => {
+    const filteredUsers = users.filter(u => {
+      const q = usersSearch.toLowerCase();
+      if (!q) return true;
+      return (u.email || '').toLowerCase().includes(q) ||
+        (u.firstName || '').toLowerCase().includes(q) ||
+        (u.lastName || '').toLowerCase().includes(q) ||
+        (u.role || '').toLowerCase().includes(q);
+    }).filter(u => !usersRoleFilter || u.role === usersRoleFilter);
+
+    const roleBadge = (role) => {
+      const styles = {
+        PRINCIPAL: { bg: '#fef3c7', color: '#92400e' },
+        ADMIN: { bg: '#dbeafe', color: '#1e40af' },
+        TEACHER: { bg: '#dcfce7', color: '#166534' },
+        STUDENT: { bg: '#f3e8ff', color: '#6b21a8' },
+      };
+      const s = styles[role] || styles.STUDENT;
+      return <span style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color }}>{role}</span>;
+    };
+
+    return (
+      <div style={{ animation: 'fadeIn 0.35s ease both' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
+          <div>
+            <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>
+              <Users size={22} style={{ display: 'inline', marginRight: 8, verticalAlign: 'text-bottom', color: '#6366f1' }} />
+              Manage Users &amp; Passwords
+            </h2>
+            <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0 0' }}>View and change passwords for all users</p>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', maxWidth: 700 }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+            <Search size={17} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input type="text" placeholder="Search by name, email..." value={usersSearch} onChange={(e) => setUsersSearch(e.target.value)}
+              style={{ width: '100%', padding: '11px 16px 11px 42px', borderRadius: 12, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = '#6366f1'; }} onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; }}
+            />
+          </div>
+          <select value={usersRoleFilter} onChange={(e) => setUsersRoleFilter(e.target.value)} style={selectStyle}>
+            <option value="">All Roles</option>
+            <option value="STUDENT">Students</option>
+            <option value="TEACHER">Teachers</option>
+            <option value="ADMIN">Admins</option>
+            <option value="PRINCIPAL">Principal</option>
+          </select>
+        </div>
+
+        {usersLoading ? renderLoader() : filteredUsers.length === 0 ? (
+          <div style={{ ...cardBase, textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+            <Users size={40} style={{ marginBottom: 12, opacity: 0.5 }} />
+            <p style={{ fontSize: 15, fontWeight: 500 }}>No users found</p>
+          </div>
+        ) : (
+          <div style={{ ...cardBase, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Name</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Email / Username</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Role</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Password</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((u, idx) => (
+                    <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#eef2ff'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: u.role === 'STUDENT' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : u.role === 'TEACHER' ? 'linear-gradient(135deg, #f59e0b, #f97316)' : 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                            {(u.firstName || '?')[0]}{(u.lastName || '')[0]}
+                          </div>
+                          <div>
+                            <p style={{ fontWeight: 600, color: '#1e293b', margin: 0, fontSize: 13 }}>{u.firstName || ''} {u.lastName || ''}</p>
+                            {u.admissionNo && <p style={{ fontSize: 11, color: '#64748b', margin: '2px 0 0' }}>Adm: {u.admissionNo}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#374151' }}>
+                        {u.email || u.teacherUsername || 'N/A'}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>{roleBadge(u.role)}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <code style={{ padding: '4px 10px', borderRadius: 6, background: u.isHashed ? '#fef2f2' : '#f0fdf4', color: u.isHashed ? '#991b1b' : '#166534', fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>
+                          {u.isHashed ? '(hashed)' : u.password}
+                        </code>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <button onClick={() => { setEditPasswordUser(u); setNewPassword(''); setEditPasswordModal(true); }}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#fff', color: '#6366f1', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                          <Edit3 size={14} /> {u.isHashed ? 'Reset' : 'Change'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: '12px 16px', borderTop: '1px solid #f1f5f9', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
+              Showing {filteredUsers.length} of {users.length} user(s)
+            </div>
+          </div>
+        )}
+
+        {/* Edit Password Modal */}
+        {editPasswordModal && editPasswordUser && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, animation: 'fadeIn 0.2s ease both' }} onClick={() => setEditPasswordModal(false)}>
+            <div style={{ background: '#fff', borderRadius: 20, padding: 28, maxWidth: 440, width: '92%', boxShadow: '0 25px 60px rgba(0,0,0,0.2)', animation: 'scaleIn 0.3s ease both' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0 }}>Change Password</h3>
+                <button onClick={() => setEditPasswordModal(false)} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: '#f1f5f9', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={18} /></button>
+              </div>
+              <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <p style={{ fontSize: 13, color: '#475569', margin: 0 }}><strong>User:</strong> {editPasswordUser.firstName} {editPasswordUser.lastName}</p>
+                <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>{editPasswordUser.email} ({editPasswordUser.role})</p>
+              </div>
+              <form onSubmit={handleEditPassword}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>New Password</label>
+                <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password (min 6 chars)"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', marginBottom: 16 }} autoFocus />
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setEditPasswordModal(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, border: '1.5px solid #d1d5db', background: '#fff', color: '#6b7280', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                  <button type="submit" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}>Update Password</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ─── Tab Content Renderer ───────────────────────────────────────────────────
   const renderTabContent = () => {
     switch (activeTab) {
@@ -2013,6 +2190,7 @@ export default function AdminPanel() {
       case 'questions':   return renderQuestions();
       case 'analytics':   return renderAnalytics();
       case 'results':     return renderResults();
+      case 'users':       return renderUsers();
       default:            return renderDashboard();
     }
   };

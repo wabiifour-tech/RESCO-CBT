@@ -37,6 +37,7 @@ const NAV_ITEMS = [
   { id: 'teachers',    label: 'Teachers',    icon: UserCheck },
   { id: 'students',    label: 'Students',    icon: GraduationCap },
   { id: 'exams',       label: 'Exams',       icon: BookOpen },
+  { id: 'users',       label: 'Users',       icon: Users },
   { id: 'results',     label: 'Results',     icon: Download },
 ];
 
@@ -163,9 +164,23 @@ export default function PrincipalDashboard() {
   const [resLoading, setResLoading] = useState(false);
   const [resPreview, setResPreview] = useState(null);
 
+  // Users management
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersSearch, setUsersSearch] = useState('');
+  const [usersRoleFilter, setUsersRoleFilter] = useState('');
+  const [editPasswordModal, setEditPasswordModal] = useState(false);
+  const [editPasswordUser, setEditPasswordUser] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+
   // Password change
   const [showPwModal, setShowPwModal] = useState(false);
   const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' });
+
+  // Logo management
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [showLogoModal, setShowLogoModal] = useState(false);
 
   // ─── Exam Management State ────────────────────────────────────────────────
   const [showCreateExamModal, setShowCreateExamModal] = useState(false);
@@ -248,13 +263,26 @@ export default function PrincipalDashboard() {
     finally { setLoading(false); }
   }, []);
 
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const params = {};
+      if (usersRoleFilter) params.role = usersRoleFilter;
+      if (usersSearch) params.search = usersSearch;
+      const res = await api.get('/principal/users', { params });
+      setUsers(res.data.users || []);
+    } catch (err) { toast.error('Failed to load users'); }
+    finally { setUsersLoading(false); }
+  }, [usersRoleFilter, usersSearch]);
+
   useEffect(() => {
     if (activeTab === 'dashboard') fetchDashboard();
     else if (activeTab === 'analytics') fetchAnalytics();
     else if (activeTab === 'teachers') fetchTeachers();
     else if (activeTab === 'students') fetchStudents();
     else if (activeTab === 'exams') fetchExams();
-  }, [activeTab, fetchDashboard, fetchAnalytics, fetchTeachers, fetchStudents, fetchExams]);
+    else if (activeTab === 'users') fetchUsers();
+  }, [activeTab, fetchDashboard, fetchAnalytics, fetchTeachers, fetchStudents, fetchExams, fetchUsers]);
 
   // Results cascading filters
   useEffect(() => {
@@ -564,6 +592,61 @@ export default function PrincipalDashboard() {
     }
   };
 
+  // ─── Logo Management ─────────────────────────────────────────────────
+  useEffect(() => {
+    api.get('/principal/settings/logo').then(() => {
+      setLogoPreview('/api/principal/settings/logo');
+    }).catch(() => {
+      setLogoPreview(null);
+    });
+  }, []);
+
+  const handleLogoUpload = async (e) => {
+    e.preventDefault();
+    const fileInput = e.target.querySelector('input[type="file"]');
+    if (!fileInput || !fileInput.files[0]) { toast.error('Select a file first'); return; }
+    setLogoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('logo', fileInput.files[0]);
+      await api.post('/principal/settings/logo', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      toast.success('Logo uploaded successfully!');
+      setLogoPreview('/api/principal/settings/logo');
+      setShowLogoModal(false);
+      window.location.reload();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to upload logo');
+    } finally { setLogoUploading(false); }
+  };
+
+  const handleLogoReset = async () => {
+    if (!window.confirm('Reset to default logo?')) return;
+    try {
+      await api.delete('/principal/settings/logo');
+      toast.success('Logo reset to default');
+      setLogoPreview(null);
+      setShowLogoModal(false);
+      window.location.reload();
+    } catch (err) {
+      toast.error('Failed to reset logo');
+    }
+  };
+
+  const handleEditPassword = async (e) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+    try {
+      await api.put(`/principal/users/${editPasswordUser.id}/password`, { newPassword });
+      toast.success('Password updated successfully!');
+      setEditPasswordModal(false);
+      setEditPasswordUser(null);
+      setNewPassword('');
+      fetchUsers();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update password');
+    }
+  };
+
   // ─── Filtered lists ─────────────────────────────────────────────────────
   const filteredTeachers = teachers.filter((t) => {
     const q = teacherSearch.toLowerCase();
@@ -615,7 +698,7 @@ export default function PrincipalDashboard() {
       <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(245,158,11,0.4)', overflow: 'hidden', padding: 4 }}>
-            <img src="/resco-logo.png" alt="RESCO" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            <img src={logoPreview || '/resco-logo.png'} alt="RESCO" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <div>
             <h2 style={{ fontSize: 13, fontWeight: 800, color: '#fff', margin: 0 }}>REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO</h2>
@@ -662,6 +745,9 @@ export default function PrincipalDashboard() {
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', margin: '2px 0 0' }}>Principal</p>
           </div>
         </div>
+        <button onClick={() => setShowLogoModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer', width: '100%', marginBottom: 6, fontWeight: 500 }}>
+          <Upload size={14} /> School Logo
+        </button>
         <button onClick={() => setShowPwModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer', width: '100%', marginBottom: 6, fontWeight: 500 }}>
           <Lock size={14} /> Change Password
         </button>
@@ -1680,6 +1766,141 @@ export default function PrincipalDashboard() {
     );
   };
 
+  // ─── Tab: Users (Password Management) ─────────────────────────────────────
+  const renderUsers = () => {
+    const filteredUsers = users.filter(u => {
+      const q = usersSearch.toLowerCase();
+      if (!q) return true;
+      return (u.email || '').toLowerCase().includes(q) ||
+        (u.firstName || '').toLowerCase().includes(q) ||
+        (u.lastName || '').toLowerCase().includes(q) ||
+        (u.role || '').toLowerCase().includes(q);
+    }).filter(u => !usersRoleFilter || u.role === usersRoleFilter);
+
+    return (
+      <div style={{ animation: 'fadeIn 0.35s ease both' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
+          <div>
+            <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>
+              <Users size={22} style={{ display: 'inline', marginRight: 8, verticalAlign: 'text-bottom', color: '#d97706' }} />
+              Manage Users &amp; Passwords
+            </h2>
+            <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0 0' }}>View and change passwords for all users</p>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', maxWidth: 700 }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+            <Search size={17} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input type="text" placeholder="Search by name, email..." value={usersSearch} onChange={(e) => setUsersSearch(e.target.value)}
+              style={{ width: '100%', padding: '11px 16px 11px 42px', borderRadius: 12, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = '#d97706'; }} onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; }}
+            />
+          </div>
+          <select value={usersRoleFilter} onChange={(e) => setUsersRoleFilter(e.target.value)} style={selectStyle}>
+            <option value="">All Roles</option>
+            <option value="STUDENT">Students</option>
+            <option value="TEACHER">Teachers</option>
+            <option value="ADMIN">Admins</option>
+            <option value="PRINCIPAL">Principal</option>
+          </select>
+        </div>
+
+        {usersLoading ? renderLoader() : filteredUsers.length === 0 ? (
+          <div style={{ ...cardBase, textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+            <Users size={40} style={{ marginBottom: 12, opacity: 0.5 }} />
+            <p style={{ fontSize: 15, fontWeight: 500 }}>No users found</p>
+          </div>
+        ) : (
+          <div style={{ ...cardBase, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Name</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Email / Username</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Role</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Password</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((u, idx) => (
+                    <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9', animation: 'fadeInUp 0.3s ease ' + (idx * 0.03) + 's both' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#fffbeb'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: u.role === 'STUDENT' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : u.role === 'TEACHER' ? 'linear-gradient(135deg, #f59e0b, #f97316)' : 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                            {(u.firstName || '?')[0]}{(u.lastName || '')[0]}
+                          </div>
+                          <div>
+                            <p style={{ fontWeight: 600, color: '#1e293b', margin: 0, fontSize: 13 }}>{u.firstName || ''} {u.lastName || ''}</p>
+                            {u.admissionNo && <p style={{ fontSize: 11, color: '#64748b', margin: '2px 0 0' }}>Adm: {u.admissionNo}</p>}
+                            {u.className && <p style={{ fontSize: 11, color: '#64748b', margin: '2px 0 0' }}>{u.className}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#374151' }}>
+                        {u.email || u.teacherUsername || 'N/A'}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: u.role === 'PRINCIPAL' ? '#fef3c7' : u.role === 'ADMIN' ? '#dbeafe' : u.role === 'TEACHER' ? '#dcfce7' : '#f3e8ff', color: u.role === 'PRINCIPAL' ? '#92400e' : u.role === 'ADMIN' ? '#1e40af' : u.role === 'TEACHER' ? '#166534' : '#6b21a8' }}>
+                          {u.role}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <code style={{ padding: '4px 10px', borderRadius: 6, background: u.isHashed ? '#fef2f2' : '#f0fdf4', color: u.isHashed ? '#991b1b' : '#166534', fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>
+                          {u.isHashed ? '(hashed)' : u.password}
+                        </code>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <button onClick={() => { setEditPasswordUser(u); setNewPassword(''); setEditPasswordModal(true); }}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 8, border: '1.5px solid #d97706', background: '#fff', color: '#d97706', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                          <Edit3 size={14} /> {u.isHashed ? 'Reset' : 'Change'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: '12px 16px', borderTop: '1px solid #f1f5f9', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
+              Showing {filteredUsers.length} of {users.length} user(s)
+            </div>
+          </div>
+        )}
+
+        {/* Edit Password Modal */}
+        {editPasswordModal && editPasswordUser && (
+          <div style={modalOverlay} onClick={() => setEditPasswordModal(false)}>
+            <div style={{ ...modalCard, maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0 }}>Change Password</h3>
+                {renderModalClose(() => setEditPasswordModal(false))}
+              </div>
+              <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <p style={{ fontSize: 13, color: '#475569', margin: 0 }}>
+                  <strong>User:</strong> {editPasswordUser.firstName} {editPasswordUser.lastName}
+                </p>
+                <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>{editPasswordUser.email} ({editPasswordUser.role})</p>
+              </div>
+              <form onSubmit={handleEditPassword}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>New Password</label>
+                <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password (min 6 chars)"
+                  style={{ ...inputStyle, marginBottom: 16 }} autoFocus />
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setEditPasswordModal(false)} style={{ ...secondaryBtn, borderColor: '#d1d5db', color: '#6b7280' }}>Cancel</button>
+                  <button type="submit" style={primaryBtn}>Update Password</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ─── Tab Content Router ─────────────────────────────────────────────────
   const renderContent = () => {
     switch (activeTab) {
@@ -1688,6 +1909,7 @@ export default function PrincipalDashboard() {
       case 'teachers': return renderTeachers();
       case 'students': return renderStudents();
       case 'exams': return renderExams();
+      case 'users': return renderUsers();
       case 'results': return renderResults();
       default: return renderDashboard();
     }
@@ -1833,6 +2055,32 @@ export default function PrincipalDashboard() {
                 <button type="submit" disabled={studentSaving} style={primaryBtn}>
                   {studentSaving ? 'Creating...' : <><GraduationCap size={15} /> Create Student</>}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Logo Upload Modal */}
+      {showLogoModal && (
+        <div style={modalOverlay} onClick={() => setShowLogoModal(false)}>
+          <div style={{ ...modalCard, maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0 }}>School Logo Settings</h3>
+              {renderModalClose(() => setShowLogoModal(false))}
+            </div>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <div style={{ width: 100, height: 100, borderRadius: 16, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', overflow: 'hidden', border: '2px dashed #d1d5db' }}>
+                <img src={logoPreview || '/resco-logo.png'} alt="Current Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </div>
+              <p style={{ fontSize: 13, color: '#64748b' }}>Current Logo</p>
+            </div>
+            <form onSubmit={handleLogoUpload}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Upload New Logo (PNG, JPG, or WebP)</label>
+              <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" style={{ width: '100%', padding: '8px', borderRadius: 8, border: '2px solid #e2e8f0', marginBottom: 16, fontSize: 13 }} />
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={handleLogoReset} style={dangerBtn}>Reset to Default</button>
+                <button type="submit" disabled={logoUploading} style={primaryBtn}>{logoUploading ? 'Uploading...' : 'Upload Logo'}</button>
               </div>
             </form>
           </div>
