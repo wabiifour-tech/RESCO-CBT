@@ -950,7 +950,7 @@ router.get('/analytics', async (req, res) => {
       status: exam.status,
       subject: exam.subject,
       className: exam.className,
-      teacherName: `${exam.teacher.firstName} ${exam.teacher.lastName}`,
+      teacherName: exam.teacher ? `${exam.teacher.firstName} ${exam.teacher.lastName}` : 'Unknown',
       questionCount: exam._count.questions,
       resultCount: exam._count.results,
       startDate: exam.startDate,
@@ -1054,7 +1054,7 @@ router.get('/exams', async (req, res) => {
         startDate: e.startDate,
         endDate: e.endDate,
         resultVisibility: e.resultVisibility,
-        teacherName: `${e.teacher.firstName} ${e.teacher.lastName}`,
+        teacherName: e.teacher ? `${e.teacher.firstName} ${e.teacher.lastName}` : 'Unknown',
         subject: e.subject,
         className: e.className,
         questionCount: e._count.questions,
@@ -1134,7 +1134,7 @@ router.post('/exams/create', async (req, res) => {
       passMark: exam.passMark,
       subject: exam.subject,
       className: exam.className,
-      teacherName: `${exam.teacher.firstName} ${exam.teacher.lastName}`,
+      teacherName: exam.teacher ? `${exam.teacher.firstName} ${exam.teacher.lastName}` : 'Unknown',
       message: 'Exam created successfully. Add questions to it before publishing.',
     });
   } catch (error) {
@@ -1285,7 +1285,7 @@ router.get('/questions/exams', async (req, res) => {
     res.json(exams.map(e => ({
       id: e.id, title: e.title, type: e.type,
       subject: e.subject, className: e.className,
-      teacherName: `${e.teacher.firstName} ${e.teacher.lastName}`,
+      teacherName: e.teacher ? `${e.teacher.firstName} ${e.teacher.lastName}` : 'Unknown',
       questionCount: e._count.questions, duration: e.duration, totalMarks: e.totalMarks,
       createdAt: e.createdAt,
     })));

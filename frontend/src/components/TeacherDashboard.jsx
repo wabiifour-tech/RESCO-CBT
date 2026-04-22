@@ -740,7 +740,7 @@ export default function TeacherDashboard() {
                         style={{ width: Math.min(pct, 100) + '%' }}
                       />
                     </div>
-                    <p className="text-xs text-gray-400">{new Date(r.submittedAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-400">{r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : ''}</p>
                   </div>
                 );
               })}
@@ -813,7 +813,7 @@ export default function TeacherDashboard() {
                               {r.percentage}%
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-500">{new Date(r.submittedAt).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-500">{r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : ''}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -285,8 +285,9 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
     if (examId) where.examId = examId;
     if (className) where.student = { className };
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const take = parseInt(limit);
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const take = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * take;
 
     const [results, total] = await Promise.all([
       prisma.result.findMany({
@@ -325,7 +326,7 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
       },
       pagination: {
         total,
-        page: parseInt(page),
+        page: pageNum,
         limit: take,
         totalPages: Math.ceil(total / take),
       },
@@ -367,7 +368,7 @@ router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER'), asy
       const correctCount = relatedAnswers.filter(a => a.correct === 1).length;
       return {
         questionId: q.id,
-        question: q.question.substring(0, 80) + (q.question.length > 80 ? '...' : ''),
+        question: q.question ? (q.question.substring(0, 80) + (q.question.length > 80 ? '...' : '')) : '',
         totalAttempts: relatedAnswers.length,
         correctCount,
         correctRate: relatedAnswers.length > 0 ? Math.round((correctCount / relatedAnswers.length) * 100) : 0,

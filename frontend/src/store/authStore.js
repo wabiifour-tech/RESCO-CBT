@@ -18,9 +18,15 @@ const useAuthStore = create((set) => ({
   },
 
   loadFromStorage: () => {
-    const user = JSON.parse(localStorage.getItem('resco_user') || 'null');
-    const token = localStorage.getItem('resco_token');
-    if (user && token) set({ user, token, isAuthenticated: true });
+    try {
+      const user = JSON.parse(localStorage.getItem('resco_user') || 'null');
+      const token = localStorage.getItem('resco_token');
+      if (user && token) set({ user, token, isAuthenticated: true });
+    } catch (e) {
+      console.warn('Failed to load auth from storage, clearing:', e.message);
+      localStorage.removeItem('resco_user');
+      localStorage.removeItem('resco_token');
+    }
   },
 }));
 
