@@ -289,7 +289,7 @@ export default function AdminPanel() {
   const handleCreateStudent = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/admin/students/create', {
+      const res = await api.post('/admin/students/create', {
         firstName: studentForm.firstName,
         lastName: studentForm.lastName,
         admissionNo: studentForm.admissionNo,
@@ -297,12 +297,14 @@ export default function AdminPanel() {
         email: studentForm.email,
         password: studentForm.password,
       });
-      toast.success('Student created successfully');
+      toast.success(res.data.message || 'Student created successfully');
       setShowStudentModal(false);
       setStudentForm({ firstName: '', lastName: '', admissionNo: '', className: '', email: '', password: '' });
       fetchStudents();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create student');
+      const errMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to create student';
+      console.error('[Create Student Error]', err.response?.data || err.message);
+      toast.error(errMsg, { duration: 6000 });
     }
   };
 
