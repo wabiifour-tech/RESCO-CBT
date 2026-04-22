@@ -618,7 +618,7 @@ export default function PrincipalDashboard() {
             <img src="/resco-logo.png" alt="RESCO" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <div>
-            <h2 style={{ fontSize: 16, fontWeight: 800, color: '#fff', margin: 0 }}>RESCO-CBT</h2>
+            <h2 style={{ fontSize: 13, fontWeight: 800, color: '#fff', margin: 0 }}>REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO</h2>
             <span style={{ fontSize: 11, color: '#fbbf24', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>Principal Portal</span>
           </div>
         </div>
@@ -1722,6 +1722,10 @@ export default function PrincipalDashboard() {
 
       {/* Main Content */}
       <div style={{ flex: 1, padding: '24px 28px', maxWidth: 1200, margin: '0 auto', width: '100%', position: 'relative', zIndex: 1 }}>
+        {/* School Name Header */}
+        <div style={{ marginBottom: 20, textAlign: 'center' }}>
+          <h1 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', margin: 0, letterSpacing: 1 }}>REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO</h1>
+        </div>
         {/* Mobile Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#374151' }}>

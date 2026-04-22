@@ -992,7 +992,7 @@ export default function StudentDashboard() {
               <img src="/resco-logo.png" alt="School Logo" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="font-extrabold text-gray-800 text-lg">RESCO CBT</h1>
+              <h1 className="font-extrabold text-gray-800 text-sm">REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO</h1>
               <p className="text-xs text-gray-400 font-medium">Student Portal</p>
             </div>
           </div>

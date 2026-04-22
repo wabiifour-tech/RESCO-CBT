@@ -335,7 +335,7 @@ export default function TeacherDashboard() {
                 <img src="/resco-logo.png" alt="School Logo" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="font-bold text-gray-800">RESCO CBT</h1>
+                <h1 className="font-bold text-gray-800 text-sm">REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO</h1>
                 <p className="text-xs text-gray-500">Teacher Portal</p>
               </div>
             </div>
@@ -540,8 +540,8 @@ export default function TeacherDashboard() {
                 <Download className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="font-bold text-gray-800">Download Results</h1>
-                <p className="text-xs text-gray-500">Teacher Portal — Export as PDF</p>
+                <h1 className="font-bold text-gray-800">REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO</h1>
+                <p className="text-xs text-gray-500">Teacher Portal — Export Results</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -723,7 +723,7 @@ export default function TeacherDashboard() {
               <img src="/resco-logo.png" alt="School Logo" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="font-bold text-gray-800">RESCO CBT</h1>
+              <h1 className="font-bold text-gray-800 text-sm">REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO</h1>
               <p className="text-xs text-gray-500">Teacher Portal</p>
             </div>
           </div>

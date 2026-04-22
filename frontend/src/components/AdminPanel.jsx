@@ -2114,7 +2114,7 @@ export default function AdminPanel() {
             </div>
           </div>
           <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>RESCO CBT</h1>
+            <h1 style={{ fontSize: 13, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO</h1>
             <p style={{ fontSize: 11, margin: '2px 0 0 0', opacity: 0.6, fontWeight: 500 }}>Admin Panel</p>
           </div>
           {/* Mobile close button */}
@@ -2286,6 +2286,11 @@ export default function AdminPanel() {
         {/* Watermark */}
         <div className="resco-watermark">
           <img src="/resco-logo.png" alt="" />
+        </div>
+
+        {/* School Name Header */}
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <h1 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', margin: 0, letterSpacing: 1 }}>REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO</h1>
         </div>
 
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
