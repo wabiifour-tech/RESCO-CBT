@@ -234,9 +234,27 @@ const server = app.listen(PORT, async () => {
     try {
       const bcrypt = require('bcryptjs');
       const principalEmail = process.env.PRINCIPAL_EMAIL || 'principal@resco';
-      const existingPrincipal = await prisma.user.findUnique({ where: { email: principalEmail } });
+      const principalPass = process.env.PRINCIPAL_PASSWORD || 'affordables';
+      let existingPrincipal = await prisma.user.findUnique({ where: { email: principalEmail } });
+
+      // Migrate old principal account if email changed
       if (!existingPrincipal) {
-        const principalPass = process.env.PRINCIPAL_PASSWORD || 'affordables';
+        const oldEmails = ['principal@resco.local'];
+        for (const oldEmail of oldEmails) {
+          const oldPrincipal = await prisma.user.findUnique({ where: { email: oldEmail } });
+          if (oldPrincipal) {
+            await prisma.user.update({
+              where: { email: oldEmail },
+              data: { email: principalEmail, password: await bcrypt.hash(principalPass, 12) },
+            });
+            existingPrincipal = await prisma.user.findUnique({ where: { email: principalEmail } });
+            console.log('✅ Principal account migrated: ' + oldEmail + ' → ' + principalEmail);
+            break;
+          }
+        }
+      }
+
+      if (!existingPrincipal) {
         const hashedPw = await bcrypt.hash(principalPass, 12);
         await prisma.user.create({
           data: {
@@ -248,6 +266,16 @@ const server = app.listen(PORT, async () => {
           },
         });
         console.log('✅ Principal account auto-created: ' + principalEmail);
+      } else {
+        // Ensure password matches current env var (in case it was changed)
+        const isMatch = await bcrypt.compare(principalPass, existingPrincipal.password);
+        if (!isMatch) {
+          await prisma.user.update({
+            where: { email: principalEmail },
+            data: { password: await bcrypt.hash(principalPass, 12) },
+          });
+          console.log('✅ Principal password updated for: ' + principalEmail);
+        }
       }
     } catch (seedErr) {
       console.warn('⚠️  Principal auto-seed skipped:', seedErr.message);
