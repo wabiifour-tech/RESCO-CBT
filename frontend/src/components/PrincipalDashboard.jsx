@@ -1527,100 +1527,6 @@ export default function PrincipalDashboard() {
         </div>
       )}
 
-      {/* ─── Create Teacher Modal ─── */}
-      {showTeacherModal && (
-        <div style={modalOverlay} onClick={(ev) => { if (ev.target === ev.currentTarget) setShowTeacherModal(false); }}>
-          <div style={modalCard}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <UserPlus size={20} style={{ color: '#d97706' }} /> Create Teacher
-              </h3>
-              {renderModalClose(() => setShowTeacherModal(false))}
-            </div>
-            <form onSubmit={handleCreateTeacher}>
-              <div style={{ display: 'grid', gap: 14 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>First Name *</label>
-                    <input type="text" value={teacherForm.firstName} onChange={(ev) => setTeacherForm({ ...teacherForm, firstName: ev.target.value })} placeholder="e.g. John" style={inputStyle} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Last Name *</label>
-                    <input type="text" value={teacherForm.lastName} onChange={(ev) => setTeacherForm({ ...teacherForm, lastName: ev.target.value })} placeholder="e.g. Smith" style={inputStyle} required />
-                  </div>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Username *</label>
-                  <input type="text" value={teacherForm.username} onChange={(ev) => setTeacherForm({ ...teacherForm, username: ev.target.value })} placeholder="e.g. jsmith" style={inputStyle} required />
-                  <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Login email will be auto-generated as: username@resco.local</p>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Password *</label>
-                  <input type="password" value={teacherForm.password} onChange={(ev) => setTeacherForm({ ...teacherForm, password: ev.target.value })} placeholder="Min 6 characters" style={inputStyle} required minLength={6} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => setShowTeacherModal(false)} style={secondaryBtn}>Cancel</button>
-                <button type="submit" disabled={teacherSaving} style={primaryBtn}>
-                  {teacherSaving ? 'Creating...' : <><UserPlus size={15} /> Create Teacher</>}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Create Student Modal ─── */}
-      {showStudentModal && (
-        <div style={modalOverlay} onClick={(ev) => { if (ev.target === ev.currentTarget) setShowStudentModal(false); }}>
-          <div style={modalCard}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <GraduationCap size={20} style={{ color: '#d97706' }} /> Create Student
-              </h3>
-              {renderModalClose(() => setShowStudentModal(false))}
-            </div>
-            <form onSubmit={handleCreateStudent}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>First Name *</label>
-                  <input type="text" value={studentForm.firstName} onChange={(ev) => setStudentForm({ ...studentForm, firstName: ev.target.value })} placeholder="e.g. Ade" style={inputStyle} required />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Last Name *</label>
-                  <input type="text" value={studentForm.lastName} onChange={(ev) => setStudentForm({ ...studentForm, lastName: ev.target.value })} placeholder="e.g. Johnson" style={inputStyle} required />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Email *</label>
-                  <input type="email" value={studentForm.email} onChange={(ev) => setStudentForm({ ...studentForm, email: ev.target.value })} placeholder="e.g. ade@resco.local" style={inputStyle} required />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Password *</label>
-                  <input type="password" value={studentForm.password} onChange={(ev) => setStudentForm({ ...studentForm, password: ev.target.value })} placeholder="Min 6 characters" style={inputStyle} required minLength={6} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Class *</label>
-                  <select value={studentForm.className} onChange={(ev) => setStudentForm({ ...studentForm, className: ev.target.value })} style={selectStyle} required>
-                    <option value="">Select class</option>
-                    {['JSS1', 'JSS2', 'JSS3', 'SSS1', 'SSS2', 'SSS3'].map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Admission No. *</label>
-                  <input type="text" value={studentForm.admissionNo} onChange={(ev) => setStudentForm({ ...studentForm, admissionNo: ev.target.value })} placeholder="e.g. RES/2024/001" style={inputStyle} required />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => setShowStudentModal(false)} style={secondaryBtn}>Cancel</button>
-                <button type="submit" disabled={studentSaving} style={primaryBtn}>
-                  {studentSaving ? 'Creating...' : <><GraduationCap size={15} /> Create Student</>}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 
@@ -1834,6 +1740,100 @@ export default function PrincipalDashboard() {
 
       {/* Password Modal */}
       {renderPasswordModal()}
+
+      {/* ─── Create Teacher Modal ─── */}
+      {showTeacherModal && (
+        <div style={modalOverlay} onClick={(ev) => { if (ev.target === ev.currentTarget) setShowTeacherModal(false); }}>
+          <div style={modalCard}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <UserPlus size={20} style={{ color: '#d97706' }} /> Create Teacher
+              </h3>
+              {renderModalClose(() => setShowTeacherModal(false))}
+            </div>
+            <form onSubmit={handleCreateTeacher}>
+              <div style={{ display: 'grid', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>First Name *</label>
+                    <input type="text" value={teacherForm.firstName} onChange={(ev) => setTeacherForm({ ...teacherForm, firstName: ev.target.value })} placeholder="e.g. John" style={inputStyle} required />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Last Name *</label>
+                    <input type="text" value={teacherForm.lastName} onChange={(ev) => setTeacherForm({ ...teacherForm, lastName: ev.target.value })} placeholder="e.g. Smith" style={inputStyle} required />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Username *</label>
+                  <input type="text" value={teacherForm.username} onChange={(ev) => setTeacherForm({ ...teacherForm, username: ev.target.value })} placeholder="e.g. jsmith" style={inputStyle} required />
+                  <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Login email will be auto-generated as: username@resco.local</p>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Password *</label>
+                  <input type="password" value={teacherForm.password} onChange={(ev) => setTeacherForm({ ...teacherForm, password: ev.target.value })} placeholder="Min 6 characters" style={inputStyle} required minLength={6} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowTeacherModal(false)} style={secondaryBtn}>Cancel</button>
+                <button type="submit" disabled={teacherSaving} style={primaryBtn}>
+                  {teacherSaving ? 'Creating...' : <><UserPlus size={15} /> Create Teacher</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Create Student Modal ─── */}
+      {showStudentModal && (
+        <div style={modalOverlay} onClick={(ev) => { if (ev.target === ev.currentTarget) setShowStudentModal(false); }}>
+          <div style={modalCard}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <GraduationCap size={20} style={{ color: '#d97706' }} /> Create Student
+              </h3>
+              {renderModalClose(() => setShowStudentModal(false))}
+            </div>
+            <form onSubmit={handleCreateStudent}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>First Name *</label>
+                  <input type="text" value={studentForm.firstName} onChange={(ev) => setStudentForm({ ...studentForm, firstName: ev.target.value })} placeholder="e.g. Ade" style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Last Name *</label>
+                  <input type="text" value={studentForm.lastName} onChange={(ev) => setStudentForm({ ...studentForm, lastName: ev.target.value })} placeholder="e.g. Johnson" style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Email *</label>
+                  <input type="email" value={studentForm.email} onChange={(ev) => setStudentForm({ ...studentForm, email: ev.target.value })} placeholder="e.g. ade@resco.local" style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Password *</label>
+                  <input type="password" value={studentForm.password} onChange={(ev) => setStudentForm({ ...studentForm, password: ev.target.value })} placeholder="Min 6 characters" style={inputStyle} required minLength={6} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Class *</label>
+                  <select value={studentForm.className} onChange={(ev) => setStudentForm({ ...studentForm, className: ev.target.value })} style={selectStyle} required>
+                    <option value="">Select class</option>
+                    {['JSS1', 'JSS2', 'JSS3', 'SSS1', 'SSS2', 'SSS3'].map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Admission No. *</label>
+                  <input type="text" value={studentForm.admissionNo} onChange={(ev) => setStudentForm({ ...studentForm, admissionNo: ev.target.value })} placeholder="e.g. RES/2024/001" style={inputStyle} required />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowStudentModal(false)} style={secondaryBtn}>Cancel</button>
+                <button type="submit" disabled={studentSaving} style={primaryBtn}>
+                  {studentSaving ? 'Creating...' : <><GraduationCap size={15} /> Create Student</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
