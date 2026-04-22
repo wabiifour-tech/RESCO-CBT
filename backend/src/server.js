@@ -233,7 +233,7 @@ const server = app.listen(PORT, async () => {
     // ── Auto-seed principal account if it doesn't exist ──
     try {
       const bcrypt = require('bcryptjs');
-      const principalEmail = process.env.PRINCIPAL_EMAIL || 'principal@resco.local';
+      const principalEmail = process.env.PRINCIPAL_EMAIL || 'principal@resco';
       const existingPrincipal = await prisma.user.findUnique({ where: { email: principalEmail } });
       if (!existingPrincipal) {
         const principalPass = process.env.PRINCIPAL_PASSWORD || 'principal123';
