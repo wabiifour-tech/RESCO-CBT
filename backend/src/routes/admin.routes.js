@@ -547,7 +547,20 @@ router.post('/students/create', async (req, res) => {
     });
   } catch (error) {
     console.error('[Admin Create Student Error]', error);
-    res.status(500).json({ error: 'Failed to create student' });
+    if (error.code === 'P2002') {
+      const target = error.meta?.target || [];
+      if (target.includes('email')) {
+        return res.status(409).json({ error: 'A user with this email already exists.' });
+      }
+      if (target.includes('admission_no')) {
+        return res.status(409).json({ error: 'A student with this admission number already exists.' });
+      }
+      return res.status(409).json({ error: 'A record with this identifier already exists.' });
+    }
+    const msg = error.code?.startsWith('P')
+      ? 'Database error: ' + (error.meta?.target || error.message)
+      : error.message || 'Failed to create student.';
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -746,7 +759,15 @@ router.post('/students/bulk', async (req, res) => {
     });
   } catch (error) {
     console.error('[Admin Bulk Create Students Error]', error);
-    res.status(500).json({ error: 'Failed to create students in bulk' });
+    if (error.code === 'P2002') {
+      const target = error.meta?.target || [];
+      const field = target.includes('email') ? 'email' : 'admission number';
+      return res.status(409).json({ error: `Duplicate ${field} detected during creation.` });
+    }
+    const msg = error.code?.startsWith('P')
+      ? 'Database error: ' + (error.meta?.target || error.message)
+      : error.message || 'Failed to create students in bulk.';
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -1702,6 +1723,7 @@ router.get('/results/export/:examId', async (req, res) => {
 
     const doc = new PDFDocument({
       size: 'A4',
+      bufferPages: true,
       margins: { top: 40, bottom: 40, left: 45, right: 45 },
       info: {
         Title: `${exam.title} - Results`,
@@ -1899,7 +1921,9 @@ router.get('/results/export/:examId', async (req, res) => {
     doc.end();
   } catch (error) {
     console.error('[Admin Export Results Error]', error);
-    res.status(500).json({ error: 'Failed to export results.' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to export results.' });
+    }
   }
 });
 

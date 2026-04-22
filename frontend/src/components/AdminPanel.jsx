@@ -1801,7 +1801,7 @@ export default function AdminPanel() {
     if (!resExamId) { toast.error('Please select an exam'); return; }
     try {
       toast.loading('Generating PDF...');
-      const res = await api.get(`/admin/results/export/${resExamId}?format=pdf`, { responseType: 'blob' });
+      const res = await api.get(`/admin/results/export/${resExamId}?format=pdf`, { responseType: 'blob', timeout: 120000 });
       const blob = new Blob([res.data], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1815,7 +1815,18 @@ export default function AdminPanel() {
       toast.success('PDF downloaded successfully!');
     } catch (err) {
       toast.dismiss();
-      toast.error(err.response?.data?.error || 'Failed to download PDF');
+      const data = err.response?.data;
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text();
+          const json = JSON.parse(text);
+          toast.error(json.error || json.message || 'Failed to download PDF');
+        } catch {
+          toast.error('Failed to download PDF');
+        }
+      } else {
+        toast.error(data?.error || data?.message || 'Failed to download PDF');
+      }
     }
   };
 

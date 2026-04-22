@@ -480,6 +480,7 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
 
     const doc = new PDFDocument({
       size: 'A4',
+      bufferPages: true,
       margins: { top: 50, bottom: 50, left: 50, right: 50 },
       info: {
         Title: `${exam.title} - Results`,
@@ -634,7 +635,9 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
     doc.end();
   } catch (error) {
     console.error('Export results error:', error);
-    res.status(500).json({ success: false, message: 'Failed to export results.' });
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Failed to export results.' });
+    }
   }
 });
 

@@ -988,8 +988,8 @@ export default function StudentDashboard() {
       <header className="bg-white/80 backdrop-blur-lg shadow-sm border-b border-gray-100 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
-              <BookOpen className="w-6 h-6 text-white" />
+            <div className="w-11 h-11 rounded-2xl overflow-hidden flex items-center justify-center bg-white border border-gray-100 shadow-lg shadow-indigo-200">
+              <img src="/resco-logo.png" alt="School Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <h1 className="font-extrabold text-gray-800 text-lg">RESCO CBT</h1>

@@ -141,7 +141,7 @@ export default function TeacherDashboard() {
     if (!dlExamId) { toast.error('Please select an exam'); return; }
     try {
       toast.loading('Generating PDF...');
-      const res = await api.get(`/results/export/${dlExamId}?format=pdf`, { responseType: 'blob' });
+      const res = await api.get(`/results/export/${dlExamId}?format=pdf`, { responseType: 'blob', timeout: 120000 });
       const blob = new Blob([res.data], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -155,7 +155,18 @@ export default function TeacherDashboard() {
       toast.success('PDF downloaded successfully!');
     } catch (err) {
       toast.dismiss();
-      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to download PDF');
+      const data = err.response?.data;
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text();
+          const json = JSON.parse(text);
+          toast.error(json.error || json.message || 'Failed to download PDF');
+        } catch {
+          toast.error('Failed to download PDF');
+        }
+      } else {
+        toast.error(data?.error || data?.message || 'Failed to download PDF');
+      }
     }
   };
 
@@ -320,8 +331,8 @@ export default function TeacherDashboard() {
         <header className="bg-white shadow-sm border-b sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-white border border-gray-100 shadow-sm">
+                <img src="/resco-logo.png" alt="School Logo" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="font-bold text-gray-800">RESCO CBT</h1>
@@ -698,8 +709,8 @@ export default function TeacherDashboard() {
       <header className="bg-white shadow-sm border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-white border border-gray-100 shadow-sm">
+              <img src="/resco-logo.png" alt="School Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <h1 className="font-bold text-gray-800">RESCO CBT</h1>
