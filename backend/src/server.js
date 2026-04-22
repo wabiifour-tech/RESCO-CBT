@@ -249,14 +249,34 @@ const server = app.listen(PORT, async () => {
             });
             existingPrincipal = await prisma.user.findUnique({ where: { email: principalEmail } });
             console.log('✅ Principal account migrated: ' + oldEmail + ' → ' + principalEmail);
+            // Ensure teacher profile exists after migration
+            await ensurePrincipalTeacherProfile(existingPrincipal);
             break;
           }
         }
       }
 
+      // Helper: ensure a Teacher record exists for the principal (so they can create exams)
+      async function ensurePrincipalTeacherProfile(principalUser) {
+        const existingTeacher = await prisma.teacher.findUnique({ where: { id: principalUser.id } });
+        if (!existingTeacher) {
+          await prisma.teacher.create({
+            data: {
+              id: principalUser.id,
+              firstName: principalUser.firstName || 'Aderonke Rachael',
+              lastName: principalUser.lastName || 'Odewabi',
+              username: 'principal',
+              status: 'ACTIVE',
+              subjects: '[]',
+            },
+          });
+          console.log('✅ Principal teacher profile created');
+        }
+      }
+
       if (!existingPrincipal) {
         const hashedPw = await bcrypt.hash(principalPass, 12);
-        await prisma.user.create({
+        const newPrincipal = await prisma.user.create({
           data: {
             email: principalEmail,
             password: hashedPw,
@@ -266,6 +286,7 @@ const server = app.listen(PORT, async () => {
           },
         });
         console.log('✅ Principal account auto-created: ' + principalEmail);
+        await ensurePrincipalTeacherProfile(newPrincipal);
       } else {
         // Ensure password matches current env var (in case it was changed)
         const isMatch = await bcrypt.compare(principalPass, existingPrincipal.password);
@@ -276,6 +297,8 @@ const server = app.listen(PORT, async () => {
           });
           console.log('✅ Principal password updated for: ' + principalEmail);
         }
+        // Ensure teacher profile exists for existing principal
+        await ensurePrincipalTeacherProfile(existingPrincipal);
       }
     } catch (seedErr) {
       console.warn('⚠️  Principal auto-seed skipped:', seedErr.message);

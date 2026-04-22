@@ -290,13 +290,14 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
 // TEACHER: Get Exam Results (with exam times)
 // ========================================
 
-router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) => {
+router.get('/teacher', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
   try {
     const { examId, className, page = 1, limit = 20 } = req.query;
 
-    const where = {
-      exam: { teacherId: req.user.userId },
-    };
+    const where = {};
+    if (req.user.role === 'TEACHER') {
+      where.exam = { teacherId: req.user.userId };
+    }
 
     if (examId) where.examId = examId;
     if (className) where.student = { className };
@@ -354,13 +355,15 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
 });
 
 // TEACHER: Detailed results for a specific exam
-router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER'), async (req, res) => {
+router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
   try {
     const { examId } = req.params;
 
-    const exam = await prisma.exam.findFirst({
-      where: { id: examId, teacherId: req.user.userId },
-    });
+    const where = { id: examId };
+    if (req.user.role === 'TEACHER') {
+      where.teacherId = req.user.userId;
+    }
+    const exam = await prisma.exam.findFirst({ where });
 
     if (!exam) {
       return res.status(404).json({ success: false, message: 'Exam not found or not yours.' });
@@ -412,14 +415,18 @@ router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER'), asy
 // TEACHER: Export Results as Watermarked PDF
 // ========================================
 
-router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, res) => {
+router.get('/export/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
   try {
     const { examId } = req.params;
     const { format } = req.query;
 
-    // Verify exam belongs to teacher
+    // Verify exam exists; PRINCIPAL can export any exam, TEACHER only their own
+    const where = { id: examId };
+    if (req.user.role === 'TEACHER') {
+      where.teacherId = req.user.userId;
+    }
     const exam = await prisma.exam.findFirst({
-      where: { id: examId, teacherId: req.user.userId },
+      where,
       include: {
         teacher: { select: { firstName: true, lastName: true } },
       },

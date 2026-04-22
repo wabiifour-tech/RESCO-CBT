@@ -10,7 +10,8 @@ import {
   X, Eye, TrendingUp, Clock, CheckCircle, XCircle,
   Search, Download, Crown, GraduationCap, Sparkles, School, Award,
   FileText, ClipboardList, Target, ChevronRight, Menu, Lock,
-  ArrowUpCircle, ArrowDownCircle, PieChart, Activity, Star, Hash
+  ArrowUpCircle, ArrowDownCircle, PieChart, Activity, Star, Hash,
+  Plus, Upload, Edit3, Trash2, Send, Archive, FileSpreadsheet
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -68,6 +69,67 @@ const hoverLift = {
 
 const selectStyle = { width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#374151', background: '#fff', outline: 'none' };
 
+const inputStyle = {
+  width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0',
+  fontSize: 14, outline: 'none', transition: 'border-color 0.2s ease',
+};
+
+const primaryBtn = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+  padding: '10px 20px', borderRadius: 12, border: 'none',
+  background: 'linear-gradient(135deg, #d97706, #b45309)',
+  color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+  boxShadow: '0 4px 14px rgba(217,119,6,0.35)', transition: 'all 0.2s ease',
+};
+
+const secondaryBtn = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  padding: '7px 14px', borderRadius: 10, border: '1.5px solid #d97706',
+  background: '#fff', color: '#d97706', fontWeight: 600, fontSize: 12,
+  cursor: 'pointer', transition: 'all 0.2s ease',
+};
+
+const dangerBtn = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  padding: '7px 14px', borderRadius: 10, border: 'none',
+  background: '#ef4444', color: '#fff', fontWeight: 600, fontSize: 12,
+  cursor: 'pointer', transition: 'all 0.2s ease',
+};
+
+const successBtn = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  padding: '7px 14px', borderRadius: 10, border: 'none',
+  background: 'linear-gradient(135deg, #10b981, #059669)',
+  color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+};
+
+const modalOverlay = {
+  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  zIndex: 100, animation: 'fadeIn 0.2s ease both',
+};
+
+const modalCard = {
+  background: '#fff', borderRadius: 20, padding: 28,
+  maxWidth: 640, width: '92%', maxHeight: '90vh', overflowY: 'auto',
+  boxShadow: '0 25px 60px rgba(0,0,0,0.2)', animation: 'scaleIn 0.3s ease both',
+};
+
+const modalCardWide = {
+  ...modalCard, maxWidth: 820,
+};
+
+const emptyNewExam = {
+  title: '', description: '', type: 'TEST', subject: '', className: '',
+  duration: 60, totalMarks: 100, passMark: 50,
+  startDate: '', endDate: '', resultVisibility: 'IMMEDIATE',
+  shuffleQuestions: false, shuffleOptions: false,
+};
+
+const emptyQuestion = {
+  question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1,
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function PrincipalDashboard() {
   const { user, logout } = useAuthStore();
@@ -103,6 +165,27 @@ export default function PrincipalDashboard() {
   // Password change
   const [showPwModal, setShowPwModal] = useState(false);
   const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' });
+
+  // ─── Exam Management State ────────────────────────────────────────────────
+  const [showCreateExamModal, setShowCreateExamModal] = useState(false);
+  const [showEditExamModal, setShowEditExamModal] = useState(false);
+  const [editingExam, setEditingExam] = useState(null);
+  const [examForm, setExamForm] = useState({ ...emptyNewExam });
+  const [examSaving, setExamSaving] = useState(false);
+
+  // Questions modal
+  const [showQuestionsModal, setShowQuestionsModal] = useState(false);
+  const [questionsExamId, setQuestionsExamId] = useState(null);
+  const [questionsExamTitle, setQuestionsExamTitle] = useState('');
+  const [questionsList, setQuestionsList] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [qForm, setQForm] = useState({ ...emptyQuestion });
+  const [qTab, setQTab] = useState('manual');
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState(null);
+  const [qSaving, setQSaving] = useState(false);
+  const [questionsReadOnly, setQuestionsReadOnly] = useState(false);
 
   // Principal name
   const principalName = user?.firstName && user?.lastName
@@ -204,9 +287,194 @@ export default function PrincipalDashboard() {
     }
   };
 
-  const handleExportPdf = (examId) => {
-    const token = localStorage.getItem('resco_token');
-    window.open(`${api.defaults.baseURL}/principal/results/export/${examId}?token=${token}`, '_blank');
+  // ─── Exam CRUD Handlers ──────────────────────────────────────────────────
+  const handleCreateExam = async (e) => {
+    e.preventDefault();
+    if (!examForm.title || !examForm.subject || !examForm.className) {
+      toast.error('Title, Subject, and Class are required');
+      return;
+    }
+    setExamSaving(true);
+    try {
+      const payload = {
+        ...examForm,
+        duration: Number(examForm.duration) || 60,
+        totalMarks: Number(examForm.totalMarks) || 100,
+        passMark: Number(examForm.passMark) || 50,
+      };
+      const res = await api.post('/exams', payload);
+      toast.success('Exam created successfully!');
+      setShowCreateExamModal(false);
+      setExamForm({ ...emptyNewExam });
+      fetchExams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create exam');
+    } finally { setExamSaving(false); }
+  };
+
+  const handleEditExam = async (e) => {
+    e.preventDefault();
+    if (!examForm.title || !examForm.subject || !examForm.className) {
+      toast.error('Title, Subject, and Class are required');
+      return;
+    }
+    setExamSaving(true);
+    try {
+      const payload = {
+        ...examForm,
+        duration: Number(examForm.duration) || 60,
+        totalMarks: Number(examForm.totalMarks) || 100,
+        passMark: Number(examForm.passMark) || 50,
+      };
+      const res = await api.put(`/exams/${editingExam.id}`, payload);
+      toast.success('Exam updated successfully!');
+      setShowEditExamModal(false);
+      setEditingExam(null);
+      setExamForm({ ...emptyNewExam });
+      fetchExams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update exam');
+    } finally { setExamSaving(false); }
+  };
+
+  const handleDeleteExam = async (examId) => {
+    if (!window.confirm('Are you sure you want to delete this exam? This action cannot be undone.')) return;
+    try {
+      await api.delete(`/exams/${examId}`);
+      toast.success('Exam deleted successfully!');
+      fetchExams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete exam');
+    }
+  };
+
+  const handlePublishExam = async (examId) => {
+    if (!window.confirm('Publish this exam? Students will be able to take it once it starts.')) return;
+    try {
+      const res = await api.patch(`/exams/${examId}/publish`);
+      toast.success(res.data.message || 'Exam published successfully!');
+      fetchExams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to publish exam');
+    }
+  };
+
+  const handleArchiveExam = async (examId) => {
+    if (!window.confirm('Archive this exam? It will no longer be available to students.')) return;
+    try {
+      const res = await api.patch(`/exams/${examId}/archive`);
+      toast.success(res.data.message || 'Exam archived successfully!');
+      fetchExams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to archive exam');
+    }
+  };
+
+  // ─── Questions Handlers ──────────────────────────────────────────────────
+  const fetchQuestions = async (examId) => {
+    setQuestionsLoading(true);
+    try {
+      const res = await api.get(`/questions/${examId}`);
+      setQuestionsList(res.data.questions || res.data || []);
+    } catch (err) {
+      toast.error('Failed to load questions');
+      setQuestionsList([]);
+    } finally { setQuestionsLoading(false); }
+  };
+
+  const openQuestionsModal = (examId, examTitle, readOnly = false) => {
+    setQuestionsExamId(examId);
+    setQuestionsExamTitle(examTitle);
+    setQuestionsReadOnly(readOnly);
+    setQForm({ ...emptyQuestion });
+    setEditingQuestion(null);
+    setUploadFile(null);
+    setQTab('manual');
+    setShowQuestionsModal(true);
+    fetchQuestions(examId);
+  };
+
+  const handleAddQuestion = async () => {
+    if (!qForm.question || !qForm.optionA || !qForm.optionB || !qForm.optionC || !qForm.optionD) {
+      toast.error('All fields are required');
+      return;
+    }
+    setQSaving(true);
+    try {
+      if (editingQuestion) {
+        await api.put(`/questions/${editingQuestion.id}`, {
+          ...qForm, marks: Number(qForm.marks) || 1,
+        });
+        toast.success('Question updated!');
+        setEditingQuestion(null);
+      } else {
+        await api.post('/questions/manual', {
+          examId: questionsExamId,
+          questions: [{ ...qForm, marks: Number(qForm.marks) || 1 }],
+        });
+        toast.success('Question added!');
+      }
+      setQForm({ ...emptyQuestion });
+      fetchQuestions(questionsExamId);
+      fetchExams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save question');
+    } finally { setQSaving(false); }
+  };
+
+  const handleDeleteQuestion = async (qId) => {
+    if (!window.confirm('Delete this question?')) return;
+    try {
+      await api.delete(`/questions/${qId}`);
+      toast.success('Question deleted!');
+      fetchQuestions(questionsExamId);
+      fetchExams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete question');
+    }
+  };
+
+  const handleUploadQuestions = async () => {
+    if (!uploadFile) { toast.error('Please select a file'); return; }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('examId', questionsExamId);
+      const res = await api.post('/questions/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000,
+      });
+      toast.success(res.data.message || 'Questions uploaded successfully!');
+      setUploadFile(null);
+      fetchQuestions(questionsExamId);
+      fetchExams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to upload questions');
+    } finally { setUploading(false); }
+  };
+
+  // ─── Download Results Handler ────────────────────────────────────────────
+  const downloadResults = (examId, format) => {
+    toast.loading('Preparing download...');
+    api.get(`/results/export/${examId}`, {
+      params: { format },
+      responseType: 'blob',
+    }).then(res => {
+      toast.dismiss();
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `exam_results.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`${format.toUpperCase()} downloaded successfully!`);
+    }).catch(err => {
+      toast.dismiss();
+      toast.error(err.response?.data?.message || 'Failed to download results');
+    });
   };
 
   // ─── Filtered lists ─────────────────────────────────────────────────────
@@ -242,6 +510,12 @@ export default function PrincipalDashboard() {
       <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
       <p style={{ marginTop: 16, color: '#64748b', fontSize: 15 }}>Loading data...</p>
     </div>
+  );
+
+  const renderModalClose = (onClose) => (
+    <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: '#f1f5f9', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <X size={18} />
+    </button>
   );
 
   const renderSidebar = () => (
@@ -727,17 +1001,17 @@ export default function PrincipalDashboard() {
     </div>
   );
 
-  // ─── Tab: Exams (read-only) ────────────────────────────────────────────
+  // ─── Tab: Exams (Full Management) ────────────────────────────────────────
   const renderExams = () => (
     <div style={{ animation: 'fadeIn 0.35s ease both' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Exams Overview</h2>
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Exam Management</h2>
           <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0' }}>{exams.length} exam(s)</p>
         </div>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: '#fef3c7', color: '#92400e', fontSize: 13, fontWeight: 600 }}>
-          <Eye size={15} /> Read-Only View
-        </span>
+        <button onClick={() => { setExamForm({ ...emptyNewExam }); setShowCreateExamModal(true); }} style={primaryBtn}>
+          <Plus size={18} /> Create Exam
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', maxWidth: 700 }}>
@@ -750,8 +1024,8 @@ export default function PrincipalDashboard() {
         </div>
         <select value={examStatusFilter} onChange={(e) => setExamStatusFilter(e.target.value)} style={selectStyle}>
           <option value="">All Statuses</option>
-          <option value="PUBLISHED">Published</option>
           <option value="DRAFT">Draft</option>
+          <option value="PUBLISHED">Published</option>
           <option value="ARCHIVED">Archived</option>
         </select>
       </div>
@@ -759,33 +1033,394 @@ export default function PrincipalDashboard() {
       {loading ? renderLoader() : filteredExams.length === 0 ? (
         <div style={cardBase}><div style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}><BookOpen size={40} style={{ marginBottom: 12, opacity: 0.5 }} /><p style={{ fontSize: 15, fontWeight: 500 }}>No exams found</p></div></div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04)' }}>
-            <thead>
-              <tr style={{ background: 'linear-gradient(135deg, #d97706, #b45309)' }}>
-                {['Title', 'Subject', 'Class', 'Type', 'Status', 'Teacher', 'Duration', 'Questions', 'Results'].map((h) => (
-                  <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredExams.map((e, idx) => (
-                <tr key={e.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '12px 14px', fontWeight: 600, color: '#1e293b' }}>{e.title}</td>
-                  <td style={{ padding: '12px 14px', color: '#374151' }}>{e.subject}</td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span style={{ padding: '3px 10px', borderRadius: 6, background: '#ecfdf5', color: '#065f46', fontSize: 12, fontWeight: 600 }}>{e.className}</span>
-                  </td>
-                  <td style={{ padding: '12px 14px', color: '#64748b', fontWeight: 500 }}>{e.type}</td>
-                  <td style={{ padding: '12px 14px' }}>{renderStatusBadge(e.status)}</td>
-                  <td style={{ padding: '12px 14px', color: '#374151', fontSize: 13 }}>{e.teacherName}</td>
-                  <td style={{ padding: '12px 14px', color: '#64748b' }}>{e.duration}min</td>
-                  <td style={{ padding: '12px 14px', fontWeight: 700, color: '#6366f1' }}>{e.questionCount}</td>
-                  <td style={{ padding: '12px 14px', fontWeight: 700, color: '#10b981' }}>{e.resultCount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
+          {filteredExams.map((e, idx) => (
+            <div key={e.id || idx} style={{ ...cardBase, padding: 20, animation: 'fadeInUp 0.4s ease ' + (idx * 0.05) + 's both' }}
+              onMouseEnter={(ev) => { ev.currentTarget.style.boxShadow = hoverLift.boxShadow; ev.currentTarget.style.transform = hoverLift.transform; }}
+              onMouseLeave={(ev) => { ev.currentTarget.style.boxShadow = cardBase.boxShadow; ev.currentTarget.style.transform = 'translateY(0)'; }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</p>
+                  <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>{e.teacherName || '—'}</p>
+                </div>
+                {renderStatusBadge(e.status)}
+              </div>
+
+              {/* Meta */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                <span style={{ padding: '3px 10px', borderRadius: 6, background: '#ecfdf5', color: '#065f46', fontSize: 12, fontWeight: 600 }}>{e.subject}</span>
+                <span style={{ padding: '3px 10px', borderRadius: 6, background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 600 }}>{e.className}</span>
+                <span style={{ padding: '3px 10px', borderRadius: 6, background: '#f1f5f9', color: '#475569', fontSize: 12, fontWeight: 500 }}>{e.type}</span>
+              </div>
+
+              {/* Stats Row */}
+              <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#64748b', marginBottom: 14 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={14} /> {e.duration}min</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><FileText size={14} /> {e.questionCount || 0} Qs</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><BarChart3 size={14} /> {e.resultCount || 0} results</span>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {e.status === 'DRAFT' && (
+                  <>
+                    <button onClick={() => openQuestionsModal(e.id, e.title)} style={secondaryBtn}>
+                      <Plus size={13} /> Add Questions
+                    </button>
+                    <button onClick={() => { setEditingExam(e); setExamForm({ title: e.title, description: e.description || '', type: e.type, subject: e.subject, className: e.className, duration: e.duration, totalMarks: e.totalMarks, passMark: e.passMark, startDate: (e.startDate || '').slice(0, 16), endDate: (e.endDate || '').slice(0, 16), resultVisibility: e.resultVisibility || 'IMMEDIATE', shuffleQuestions: e.shuffleQuestions || false, shuffleOptions: e.shuffleOptions || false }); setShowEditExamModal(true); }} style={secondaryBtn}>
+                      <Edit3 size={13} /> Edit
+                    </button>
+                    {(e.questionCount || 0) > 0 && (
+                      <button onClick={() => handlePublishExam(e.id)} style={successBtn}>
+                        <Send size={13} /> Publish
+                      </button>
+                    )}
+                    <button onClick={() => handleDeleteExam(e.id)} style={dangerBtn}>
+                      <Trash2 size={13} /> Delete
+                    </button>
+                  </>
+                )}
+                {e.status === 'PUBLISHED' && (
+                  <>
+                    <button onClick={() => openQuestionsModal(e.id, e.title, true)} style={secondaryBtn}>
+                      <Eye size={13} /> View Questions
+                    </button>
+                    <button onClick={() => handleArchiveExam(e.id)} style={{ ...secondaryBtn, borderColor: '#f59e0b', color: '#92400e' }}>
+                      <Archive size={13} /> Archive
+                    </button>
+                  </>
+                )}
+                {e.status === 'ARCHIVED' && (
+                  <span style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Archived — no actions available</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ─── Create Exam Modal ─── */}
+      {showCreateExamModal && (
+        <div style={modalOverlay} onClick={(ev) => { if (ev.target === ev.currentTarget) setShowCreateExamModal(false); }}>
+          <div style={modalCardWide}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Plus size={20} style={{ color: '#d97706' }} /> Create New Exam
+              </h3>
+              {renderModalClose(() => setShowCreateExamModal(false))}
+            </div>
+            <form onSubmit={handleCreateExam}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Title *</label>
+                  <input type="text" value={examForm.title} onChange={(ev) => setExamForm({ ...examForm, title: ev.target.value })} placeholder="e.g. JSS1 First Term Mathematics Exam" style={inputStyle} required />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Description</label>
+                  <textarea value={examForm.description} onChange={(ev) => setExamForm({ ...examForm, description: ev.target.value })} placeholder="Optional description..." rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Type</label>
+                  <select value={examForm.type} onChange={(ev) => setExamForm({ ...examForm, type: ev.target.value })} style={selectStyle}>
+                    <option value="TEST">Test</option>
+                    <option value="EXAM">Exam</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Subject *</label>
+                  <input type="text" value={examForm.subject} onChange={(ev) => setExamForm({ ...examForm, subject: ev.target.value })} placeholder="e.g. Mathematics" style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Class *</label>
+                  <select value={examForm.className} onChange={(ev) => setExamForm({ ...examForm, className: ev.target.value })} style={selectStyle} required>
+                    <option value="">Select class</option>
+                    {['JSS1', 'JSS2', 'JSS3', 'SSS1', 'SSS2', 'SSS3'].map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Duration (minutes) *</label>
+                  <input type="number" min="1" value={examForm.duration} onChange={(ev) => setExamForm({ ...examForm, duration: ev.target.value })} style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Total Marks *</label>
+                  <input type="number" min="1" value={examForm.totalMarks} onChange={(ev) => setExamForm({ ...examForm, totalMarks: ev.target.value })} style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Pass Mark *</label>
+                  <input type="number" min="0" value={examForm.passMark} onChange={(ev) => setExamForm({ ...examForm, passMark: ev.target.value })} style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Start Date</label>
+                  <input type="datetime-local" value={examForm.startDate} onChange={(ev) => setExamForm({ ...examForm, startDate: ev.target.value })} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>End Date</label>
+                  <input type="datetime-local" value={examForm.endDate} onChange={(ev) => setExamForm({ ...examForm, endDate: ev.target.value })} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Result Visibility</label>
+                  <select value={examForm.resultVisibility} onChange={(ev) => setExamForm({ ...examForm, resultVisibility: ev.target.value })} style={selectStyle}>
+                    <option value="MANUAL">Manual Release</option>
+                    <option value="IMMEDIATE">Immediate</option>
+                    <option value="AFTER_CLOSE">After Exam Closes</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: '#374151' }}>
+                    <input type="checkbox" checked={examForm.shuffleQuestions} onChange={(ev) => setExamForm({ ...examForm, shuffleQuestions: ev.target.checked })} />
+                    Shuffle Questions
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: '#374151' }}>
+                    <input type="checkbox" checked={examForm.shuffleOptions} onChange={(ev) => setExamForm({ ...examForm, shuffleOptions: ev.target.checked })} />
+                    Shuffle Options
+                  </label>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowCreateExamModal(false)} style={{ ...secondaryBtn, padding: '10px 20px', fontSize: 14 }}>Cancel</button>
+                <button type="submit" disabled={examSaving} style={primaryBtn}>
+                  {examSaving ? 'Creating...' : <><Plus size={16} /> Create Exam</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Edit Exam Modal ─── */}
+      {showEditExamModal && (
+        <div style={modalOverlay} onClick={(ev) => { if (ev.target === ev.currentTarget) setShowEditExamModal(false); }}>
+          <div style={modalCardWide}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Edit3 size={20} style={{ color: '#d97706' }} /> Edit Exam
+              </h3>
+              {renderModalClose(() => setShowEditExamModal(false))}
+            </div>
+            <form onSubmit={handleEditExam}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Title *</label>
+                  <input type="text" value={examForm.title} onChange={(ev) => setExamForm({ ...examForm, title: ev.target.value })} style={inputStyle} required />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Description</label>
+                  <textarea value={examForm.description} onChange={(ev) => setExamForm({ ...examForm, description: ev.target.value })} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Type</label>
+                  <select value={examForm.type} onChange={(ev) => setExamForm({ ...examForm, type: ev.target.value })} style={selectStyle}>
+                    <option value="TEST">Test</option>
+                    <option value="EXAM">Exam</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Subject *</label>
+                  <input type="text" value={examForm.subject} onChange={(ev) => setExamForm({ ...examForm, subject: ev.target.value })} style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Class *</label>
+                  <select value={examForm.className} onChange={(ev) => setExamForm({ ...examForm, className: ev.target.value })} style={selectStyle} required>
+                    <option value="">Select class</option>
+                    {['JSS1', 'JSS2', 'JSS3', 'SSS1', 'SSS2', 'SSS3'].map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Duration (minutes) *</label>
+                  <input type="number" min="1" value={examForm.duration} onChange={(ev) => setExamForm({ ...examForm, duration: ev.target.value })} style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Total Marks *</label>
+                  <input type="number" min="1" value={examForm.totalMarks} onChange={(ev) => setExamForm({ ...examForm, totalMarks: ev.target.value })} style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Pass Mark *</label>
+                  <input type="number" min="0" value={examForm.passMark} onChange={(ev) => setExamForm({ ...examForm, passMark: ev.target.value })} style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Start Date</label>
+                  <input type="datetime-local" value={examForm.startDate} onChange={(ev) => setExamForm({ ...examForm, startDate: ev.target.value })} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>End Date</label>
+                  <input type="datetime-local" value={examForm.endDate} onChange={(ev) => setExamForm({ ...examForm, endDate: ev.target.value })} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Result Visibility</label>
+                  <select value={examForm.resultVisibility} onChange={(ev) => setExamForm({ ...examForm, resultVisibility: ev.target.value })} style={selectStyle}>
+                    <option value="MANUAL">Manual Release</option>
+                    <option value="IMMEDIATE">Immediate</option>
+                    <option value="AFTER_CLOSE">After Exam Closes</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: '#374151' }}>
+                    <input type="checkbox" checked={examForm.shuffleQuestions} onChange={(ev) => setExamForm({ ...examForm, shuffleQuestions: ev.target.checked })} />
+                    Shuffle Questions
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: '#374151' }}>
+                    <input type="checkbox" checked={examForm.shuffleOptions} onChange={(ev) => setExamForm({ ...examForm, shuffleOptions: ev.target.checked })} />
+                    Shuffle Options
+                  </label>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowEditExamModal(false)} style={{ ...secondaryBtn, padding: '10px 20px', fontSize: 14 }}>Cancel</button>
+                <button type="submit" disabled={examSaving} style={primaryBtn}>
+                  {examSaving ? 'Saving...' : <><Edit3 size={16} /> Save Changes</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Questions Modal ─── */}
+      {showQuestionsModal && (
+        <div style={modalOverlay} onClick={(ev) => { if (ev.target === ev.currentTarget) setShowQuestionsModal(false); }}>
+          <div style={modalCardWide}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <FileText size={20} style={{ color: '#d97706' }} />
+                {questionsReadOnly ? 'View Questions' : 'Manage Questions'} — {questionsExamTitle}
+              </h3>
+              {renderModalClose(() => setShowQuestionsModal(false))}
+            </div>
+
+            {/* Tabs (only when editable) */}
+            {!questionsReadOnly && (
+              <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '2px solid #e2e8f0' }}>
+                {[
+                  { key: 'manual', label: 'Manual Entry', icon: Edit3 },
+                  { key: 'upload', label: 'File Upload', icon: Upload },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const active = qTab === tab.key;
+                  return (
+                    <button key={tab.key} onClick={() => setQTab(tab.key)} type="button"
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', border: 'none', background: 'none', borderBottom: active ? '2px solid #d97706' : '2px solid transparent', marginBottom: '-2px', color: active ? '#d97706' : '#64748b', fontWeight: active ? 700 : 500, fontSize: 14, cursor: 'pointer' }}>
+                      <Icon size={15} /> {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Manual Entry Tab */}
+            {!questionsReadOnly && qTab === 'manual' && (
+              <div style={{ marginBottom: 20 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 12 }}>
+                  {editingQuestion ? 'Edit Question' : 'Add a New Question'}
+                </p>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <textarea value={qForm.question} onChange={(ev) => setQForm({ ...qForm, question: ev.target.value })} placeholder="Type the question here..." rows={3} style={inputStyle} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <input type="text" value={qForm.optionA} onChange={(ev) => setQForm({ ...qForm, optionA: ev.target.value })} placeholder="Option A" style={inputStyle} />
+                    <input type="text" value={qForm.optionB} onChange={(ev) => setQForm({ ...qForm, optionB: ev.target.value })} placeholder="Option B" style={inputStyle} />
+                    <input type="text" value={qForm.optionC} onChange={(ev) => setQForm({ ...qForm, optionC: ev.target.value })} placeholder="Option C" style={inputStyle} />
+                    <input type="text" value={qForm.optionD} onChange={(ev) => setQForm({ ...qForm, optionD: ev.target.value })} placeholder="Option D" style={inputStyle} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Correct Answer</label>
+                      <select value={qForm.answer} onChange={(ev) => setQForm({ ...qForm, answer: ev.target.value })} style={selectStyle}>
+                        {['A', 'B', 'C', 'D'].map(o => <option key={o} value={o}>Option {o}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Marks</label>
+                      <input type="number" min="1" value={qForm.marks} onChange={(ev) => setQForm({ ...qForm, marks: ev.target.value })} style={inputStyle} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button type="button" onClick={handleAddQuestion} disabled={qSaving} style={primaryBtn}>
+                      {qSaving ? 'Saving...' : editingQuestion ? <><Edit3 size={15} /> Update Question</> : <><Plus size={15} /> Add Question</>}
+                    </button>
+                    {editingQuestion && (
+                      <button type="button" onClick={() => { setEditingQuestion(null); setQForm({ ...emptyQuestion }); }} style={secondaryBtn}>
+                        Cancel Edit
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Upload Tab */}
+            {!questionsReadOnly && qTab === 'upload' && (
+              <div style={{ marginBottom: 20, padding: 20, border: '2px dashed #d1d5db', borderRadius: 14, textAlign: 'center', background: '#fafafa' }}>
+                <Upload size={32} style={{ color: '#94a3b8', marginBottom: 8 }} />
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Upload Question File</p>
+                <p style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Accepted formats: CSV, PDF, DOCX, TXT</p>
+                <input type="file" accept=".csv,.pdf,.docx,.txt" onChange={(ev) => setUploadFile(ev.target.files[0])} style={{ display: 'none' }} id="q-upload-input" />
+                <label htmlFor="q-upload-input" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: '1.5px solid #d97706', background: '#fff', color: '#d97706', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                  <Upload size={14} /> Choose File
+                </label>
+                {uploadFile && (
+                  <p style={{ fontSize: 12, color: '#059669', marginTop: 8, fontWeight: 500 }}>{uploadFile.name}</p>
+                )}
+                <div style={{ marginTop: 12 }}>
+                  <button type="button" onClick={handleUploadQuestions} disabled={!uploadFile || uploading} style={primaryBtn}>
+                    {uploading ? 'Uploading...' : <><Upload size={15} /> Upload Questions</>}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Existing Questions List */}
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 10 }}>
+                Questions ({questionsList.length})
+              </p>
+              {questionsLoading ? (
+                <div style={{ textAlign: 'center', padding: 30, color: '#94a3b8' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid #e2e8f0', borderTopColor: '#d97706', animation: 'spin 0.8s linear infinite', margin: '0 auto 10px' }} />
+                  <p style={{ fontSize: 13 }}>Loading questions...</p>
+                </div>
+              ) : questionsList.length === 0 ? (
+                <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                  <FileText size={28} style={{ marginBottom: 8, opacity: 0.4 }} />
+                  <p style={{ fontSize: 13 }}>No questions yet</p>
+                </div>
+              ) : (
+                <div style={{ maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {questionsList.map((q, qIdx) => (
+                    <div key={q.id || qIdx} style={{ padding: 12, border: '1px solid #e2e8f0', borderRadius: 10, background: '#fafafa', animation: 'fadeInUp 0.3s ease ' + (qIdx * 0.04) + 's both' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 3 }}>Q{qIdx + 1}.</p>
+                          <p style={{ fontSize: 13, color: '#1e293b', fontWeight: 500, margin: 0, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{q.question || q.questionText}</p>
+                          <div style={{ display: 'flex', gap: 12, fontSize: 12, color: '#64748b', flexWrap: 'wrap' }}>
+                            <span>A: {q.optionA}</span>
+                            <span>B: {q.optionB}</span>
+                            <span>C: {q.optionC}</span>
+                            <span>D: {q.optionD}</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                          <span style={{ padding: '2px 8px', borderRadius: 6, background: '#dcfce7', color: '#166534', fontSize: 11, fontWeight: 700 }}>
+                            Ans: {q.answer}
+                          </span>
+                          <span style={{ fontSize: 11, color: '#64748b' }}>{q.marks || 1} mark(s)</span>
+                        </div>
+                      </div>
+                      {!questionsReadOnly && (
+                        <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
+                          <button onClick={() => { setEditingQuestion(q); setQForm({ question: q.question || q.questionText || '', optionA: q.optionA || '', optionB: q.optionB || '', optionC: q.optionC || '', optionD: q.optionD || '', answer: q.answer || 'A', marks: q.marks || 1 }); }} style={{ ...secondaryBtn, padding: '4px 10px', fontSize: 11 }}>
+                            <Edit3 size={12} /> Edit
+                          </button>
+                          <button onClick={() => handleDeleteQuestion(q.id)} style={{ ...dangerBtn, padding: '4px 10px', fontSize: 11 }}>
+                            <Trash2 size={12} /> Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -842,10 +1477,13 @@ export default function PrincipalDashboard() {
             ))}
           </div>
 
-          {/* Export Button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-            <button onClick={() => handleExportPdf(resExamId)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #d97706, #b45309)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: '0 4px 14px rgba(217,119,6,0.35)' }}>
-              <Download size={17} /> Download PDF Report
+          {/* Export Buttons */}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginBottom: 16, flexWrap: 'wrap' }}>
+            <button onClick={() => downloadResults(resExamId, 'pdf')} style={primaryBtn}>
+              <FileText size={16} /> Download PDF
+            </button>
+            <button onClick={() => downloadResults(resExamId, 'csv')} style={{ ...primaryBtn, background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 14px rgba(5,150,105,0.35)' }}>
+              <FileSpreadsheet size={16} /> Download CSV
             </button>
           </div>
 
@@ -862,10 +1500,7 @@ export default function PrincipalDashboard() {
               <tbody>
                 {resPreview.results.map((r) => (
                   <tr key={r.studentId} style={{ borderBottom: '1px solid #f1f5f9', background: r.status === 'PASS' ? '#fff' : '#fef2f2' }}>
-                    <td style={{ padding: '10px 14px', fontWeight: 700, color: r.rank <= 3 ? '#d97706' : '#64748b' }}>
-                      {r.rank <= 3 && <span style={{ marginRight: 4 }}>{['#gold_medal:', '#silver_medal:', '#bronze_medal:'][r.rank - 1]}</span>}
-                      {r.rank}
-                    </td>
+                    <td style={{ padding: '10px 14px', fontWeight: 700, color: r.rank <= 3 ? '#d97706' : '#64748b' }}>{r.rank}</td>
                     <td style={{ padding: '10px 14px', fontWeight: 600, color: '#1e293b' }}>{r.firstName} {r.lastName}</td>
                     <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: 13, color: '#374151' }}>{r.admissionNo}</td>
                     <td style={{ padding: '10px 14px' }}>
@@ -881,6 +1516,16 @@ export default function PrincipalDashboard() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Bottom Download Buttons */}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16, flexWrap: 'wrap' }}>
+            <button onClick={() => downloadResults(resExamId, 'pdf')} style={secondaryBtn}>
+              <FileText size={14} /> Download PDF
+            </button>
+            <button onClick={() => downloadResults(resExamId, 'csv')} style={{ ...secondaryBtn, borderColor: '#059669', color: '#059669' }}>
+              <FileSpreadsheet size={14} /> Download CSV
+            </button>
           </div>
         </div>
       ) : (
@@ -953,20 +1598,6 @@ export default function PrincipalDashboard() {
       {sidebarOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 35 }} onClick={() => setSidebarOpen(false)} />
       )}
-
-      {/* Sidebar */}
-      <div style={{ display: sidebarOpen ? 'block' : 'none' }} className="md:block">
-        <div style={{ position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 40 }}>
-          {renderSidebar()}
-        </div>
-      </div>
-      {/* Desktop sidebar always visible */}
-      <style>{`@media (min-width: 768px) { .md-block { display: block !important; } } @media (max-width: 767px) { .md-block { display: none !important; } }`}</style>
-      {/* Mobile sidebar */}
-      <style>{`@media (max-width: 767px) { .md-block.mobile-open { display: block !important; } }`}</style>
-      <div style={{ display: 'none' }}>
-        <style>{`@media (min-width: 768px) { #sidebar-desktop { display: block !important; } }`}</style>
-      </div>
 
       {/* Desktop sidebar wrapper */}
       <div id="sidebar-desktop" style={{ display: 'none' }}>

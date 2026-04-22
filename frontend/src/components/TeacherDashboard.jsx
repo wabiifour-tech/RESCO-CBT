@@ -630,6 +630,16 @@ export default function TeacherDashboard() {
                 {dlLoading ? 'Generating...' : 'Download PDF'}
               </button>
 
+              {/* Download CSV Button */}
+              <button
+                onClick={() => handleExport(dlExamId, 'csv')}
+                disabled={!dlExamId}
+                className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-300 disabled:to-gray-400 text-white font-bold py-3.5 px-6 rounded-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg shadow-emerald-200 mt-3"
+              >
+                <Download className="w-5 h-5" />
+                Download CSV
+              </button>
+
               {/* Preview */}
               {dlPreview && (
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -925,10 +935,16 @@ export default function TeacherDashboard() {
                           <BarChart3 className="w-3.5 h-3.5" /> Results
                         </button>
                         <button
+                          onClick={() => handleExport(exam.id, 'pdf')}
+                          className="flex items-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200 transition-all"
+                        >
+                          <Download className="w-3.5 h-3.5" /> PDF
+                        </button>
+                        <button
                           onClick={() => handleExport(exam.id, 'csv')}
                           className="flex items-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200 transition-all"
                         >
-                          <Download className="w-3.5 h-3.5" /> Export
+                          <Download className="w-3.5 h-3.5" /> CSV
                         </button>
                       </div>
                     </div>

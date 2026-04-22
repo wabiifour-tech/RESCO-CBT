@@ -30,14 +30,16 @@ const upload = multer({
 // ============================================================
 // Helper: Verify exam belongs to the authenticated teacher
 // ============================================================
-async function verifyTeacherOwnsExam(teacherId, examId) {
-  const exam = await prisma.exam.findFirst({
+async function verifyTeacherOwnsExam(teacherId, examId, role) {
+  if (role === 'PRINCIPAL' || role === 'ADMIN') {
+    return prisma.exam.findFirst({ where: { id: examId } });
+  }
+  return prisma.exam.findFirst({
     where: {
       id: examId,
       teacherId,
     },
   });
-  return exam;
 }
 
 // ============================================================
@@ -246,7 +248,7 @@ function parseTextQuestions(text) {
 // ============================================================
 // POST /manual - Add Questions Manually
 // ============================================================
-router.post('/manual', authenticate, requireRole('TEACHER'), async (req, res) => {
+router.post('/manual', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
   try {
     const { examId, questions } = req.body;
 
@@ -273,7 +275,7 @@ router.post('/manual', authenticate, requireRole('TEACHER'), async (req, res) =>
     }
 
     // --- Verify exam belongs to this teacher ---
-    const exam = await verifyTeacherOwnsExam(req.user.userId, examId);
+    const exam = await verifyTeacherOwnsExam(req.user.userId, examId, req.user.role);
 
     if (!exam) {
       return res.status(404).json({
@@ -350,7 +352,7 @@ router.post('/manual', authenticate, requireRole('TEACHER'), async (req, res) =>
 // ============================================================
 // POST /upload - Upload Questions (CSV, PDF, DOCX, TXT)
 // ============================================================
-router.post('/upload', authenticate, requireRole('TEACHER'), upload.single('file'), async (req, res) => {
+router.post('/upload', authenticate, requireRole('TEACHER', 'PRINCIPAL'), upload.single('file'), async (req, res) => {
   try {
     const { examId } = req.body;
 
@@ -369,8 +371,8 @@ router.post('/upload', authenticate, requireRole('TEACHER'), upload.single('file
       });
     }
 
-    // --- Verify exam belongs to this teacher ---
-    const exam = await verifyTeacherOwnsExam(req.user.userId, examId);
+    // --- Verify exam belongs to this teacher (or user is PRINCIPAL/ADMIN) ---
+    const exam = await verifyTeacherOwnsExam(req.user.userId, examId, req.user.role);
 
     if (!exam) {
       return res.status(404).json({
@@ -484,12 +486,12 @@ router.post('/upload', authenticate, requireRole('TEACHER'), upload.single('file
 // ============================================================
 // GET /:examId - Get Questions for Exam (Teacher View)
 // ============================================================
-router.get('/:examId', authenticate, requireRole('TEACHER'), async (req, res) => {
+router.get('/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
   try {
     const { examId } = req.params;
 
-    // --- Verify exam belongs to this teacher ---
-    const exam = await verifyTeacherOwnsExam(req.user.userId, examId);
+    // --- Verify exam belongs to this teacher (or user is PRINCIPAL/ADMIN) ---
+    const exam = await verifyTeacherOwnsExam(req.user.userId, examId, req.user.role);
 
     if (!exam) {
       return res.status(404).json({
@@ -539,7 +541,7 @@ router.get('/:examId', authenticate, requireRole('TEACHER'), async (req, res) =>
 // ============================================================
 // PUT /:id - Update a Question
 // ============================================================
-router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
+router.put('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -624,8 +626,8 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
       });
     }
 
-    // --- Verify exam belongs to this teacher ---
-    if (question.exam.teacherId !== req.user.userId) {
+    // --- Verify exam belongs to this teacher (or user is PRINCIPAL/ADMIN) ---
+    if (req.user.role !== 'PRINCIPAL' && req.user.role !== 'ADMIN' && question.exam.teacherId !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to this question.',
@@ -663,7 +665,7 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
 // ============================================================
 // DELETE /:id - Delete a Question
 // ============================================================
-router.delete('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
+router.delete('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -692,8 +694,8 @@ router.delete('/:id', authenticate, requireRole('TEACHER'), async (req, res) => 
       });
     }
 
-    // --- Verify exam belongs to this teacher ---
-    if (question.exam.teacherId !== req.user.userId) {
+    // --- Verify exam belongs to this teacher (or user is PRINCIPAL/ADMIN) ---
+    if (req.user.role !== 'PRINCIPAL' && req.user.role !== 'ADMIN' && question.exam.teacherId !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to this question.',

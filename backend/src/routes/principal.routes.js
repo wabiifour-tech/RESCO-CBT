@@ -612,6 +612,7 @@ router.get('/results/:examId', async (req, res) => {
 router.get('/results/export/:examId', async (req, res) => {
   try {
     const { examId } = req.params;
+    const { format } = req.query;
 
     const exam = await prisma.exam.findUnique({
       where: { id: examId },
@@ -635,6 +636,34 @@ router.get('/results/export/:examId', async (req, res) => {
 
     if (results.length === 0) {
       return res.status(404).json({ error: 'No results found for this exam' });
+    }
+
+    // CSV format
+    if (format === 'csv') {
+      const filename = `${exam.title.replace(/[^a-zA-Z0-9]/g, '_')}_Results`;
+      const headers = ['Rank', 'Admission No', 'First Name', 'Last Name', 'Class', 'Score', 'Total Marks', 'Percentage', 'Status', 'Time Spent (min)', 'Submitted At'];
+      const ranked = results.map((r, idx) => {
+        const pct = Math.round(r.percentage * 100) / 100;
+        const status = pct >= exam.passMark ? 'PASS' : 'FAIL';
+        return [
+          idx + 1,
+          r.student?.admissionNo || 'N/A',
+          r.student?.firstName || 'Unknown',
+          r.student?.lastName || 'Unknown',
+          r.student?.className || 'N/A',
+          r.score,
+          r.totalMarks,
+          `${pct}%`,
+          status,
+          r.timeSpent != null ? Math.round(r.timeSpent / 60) : 'N/A',
+          r.submittedAt ? r.submittedAt.toISOString().replace('T', ' ').substring(0, 19) : '',
+        ];
+      });
+
+      const csv = [headers.join(','), ...ranked.map(row => row.join(','))].join('\n');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
+      return res.send(csv);
     }
 
     // Generate PDF using PDFKit

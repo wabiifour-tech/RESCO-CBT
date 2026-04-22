@@ -1832,6 +1832,40 @@ export default function AdminPanel() {
     }
   };
 
+  // ─── Results: CSV download handler ──────────────────────────────────────────
+  const handleResDownloadCSV = async () => {
+    if (!resExamId) { toast.error('Please select an exam'); return; }
+    try {
+      toast.loading('Generating CSV...');
+      const res = await api.get(`/admin/results/export/${resExamId}?format=csv`, { responseType: 'blob', timeout: 120000 });
+      const blob = new Blob([res.data], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (resExams.find(e => e.id === resExamId)?.title || 'results') + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.dismiss();
+      toast.success('CSV downloaded successfully!');
+    } catch (err) {
+      toast.dismiss();
+      const data = err.response?.data;
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text();
+          const json = JSON.parse(text);
+          toast.error(json.error || json.message || 'Failed to download CSV');
+        } catch {
+          toast.error('Failed to download CSV');
+        }
+      } else {
+        toast.error(data?.error || data?.message || 'Failed to download CSV');
+      }
+    }
+  };
+
   // ─── Tab Content: Results ────────────────────────────────────────────────────
   const renderResults = () => {
     return (
@@ -1915,6 +1949,20 @@ export default function AdminPanel() {
             }}
           >
             {resLoading ? 'Generating...' : '\u2B07 Download PDF'}
+          </button>
+
+          {/* Download CSV Button */}
+          <button
+            onClick={handleResDownloadCSV}
+            disabled={!resExamId || resLoading}
+            style={{
+              width: '100%', marginTop: 8, padding: '12px', fontSize: 14, fontWeight: 700,
+              color: '#fff', background: resExamId ? 'linear-gradient(135deg, #059669, #047857)' : '#d1d5db',
+              border: 'none', borderRadius: 10, cursor: resExamId ? 'pointer' : 'not-allowed',
+              transition: 'all 0.2s',
+            }}
+          >
+            {'\u2B07 Download CSV'}
           </button>
 
           {/* Preview */}

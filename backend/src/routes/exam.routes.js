@@ -10,8 +10,8 @@ const router = express.Router();
 // TEACHER ROUTES
 // ========================================
 
-// Create Exam
-router.post('/', authenticate, requireRole('TEACHER'), requireTeacherActive, async (req, res) => {
+// Create Exam (TEACHER or PRINCIPAL)
+router.post('/', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
   try {
     const { title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility, shuffleQuestions, shuffleOptions, subject, className } = req.body;
 
@@ -94,14 +94,17 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
   }
 });
 
-// Update Exam (only DRAFT)
-router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
+// Update Exam (only DRAFT) — TEACHER, PRINCIPAL, ADMIN
+router.put('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
   try {
     const { id } = req.params;
 
-    const exam = await prisma.exam.findFirst({
-      where: { id, teacherId: req.user.userId },
-    });
+    const where = { id };
+    if (req.user.role !== 'PRINCIPAL' && req.user.role !== 'ADMIN') {
+      where.teacherId = req.user.userId;
+    }
+
+    const exam = await prisma.exam.findFirst({ where });
 
     if (!exam) {
       return res.status(404).json({ success: false, message: 'Exam not found.' });
@@ -139,13 +142,18 @@ router.put('/:id', authenticate, requireRole('TEACHER'), async (req, res) => {
   }
 });
 
-// Publish Exam
-router.patch('/:id/publish', authenticate, requireRole('TEACHER'), async (req, res) => {
+// Publish Exam — TEACHER, PRINCIPAL, ADMIN
+router.patch('/:id/publish', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
   try {
     const { id } = req.params;
 
+    const where = { id };
+    if (req.user.role !== 'PRINCIPAL' && req.user.role !== 'ADMIN') {
+      where.teacherId = req.user.userId;
+    }
+
     const exam = await prisma.exam.findFirst({
-      where: { id, teacherId: req.user.userId },
+      where,
       include: { _count: { select: { questions: true } } },
     });
 
@@ -173,14 +181,14 @@ router.patch('/:id/publish', authenticate, requireRole('TEACHER'), async (req, r
   }
 });
 
-// Archive Exam
-router.patch('/:id/archive', authenticate, requireRole('TEACHER', 'ADMIN'), async (req, res) => {
+// Archive Exam — TEACHER, PRINCIPAL, ADMIN
+router.patch('/:id/archive', authenticate, requireRole('TEACHER', 'ADMIN', 'PRINCIPAL'), async (req, res) => {
   try {
     const { id } = req.params;
 
     const where = { id };
-    // Teachers can only archive their own exams; admins can archive any
-    if (req.user.role === 'TEACHER') {
+    // Teachers can only archive their own exams; admins/principals can archive any
+    if (req.user.role !== 'PRINCIPAL' && req.user.role !== 'ADMIN') {
       where.teacherId = req.user.userId;
     }
 
