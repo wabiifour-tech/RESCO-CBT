@@ -817,6 +817,7 @@ router.get('/analytics', async (req, res) => {
 
     for (const key of Object.keys(studentAvgMap)) {
       const data = studentAvgMap[key];
+      if (data.percentages.length === 0) continue;
       const avg = data.percentages.reduce((a, b) => a + b, 0) / data.percentages.length;
       if (!classScores[data.cls]) {
         classScores[data.cls] = { total: 0, count: 0 };
@@ -899,24 +900,26 @@ router.get('/analytics', async (req, res) => {
       take: 20,
     });
 
-    const topStudentsData = await Promise.all(
+    const topStudentsData = (await Promise.all(
       topStudents.map(async (ts) => {
         const student = await prisma.student.findUnique({
           where: { id: ts.studentId },
           include: { user: { select: { email: true } } },
         });
+        // Skip if student was deleted
+        if (!student) return null;
         return {
           studentId: ts.studentId,
-          admissionNo: student?.admissionNo,
-          firstName: student?.firstName,
-          lastName: student?.lastName,
-          className: student?.className,
-          email: student?.user?.email,
+          admissionNo: student.admissionNo,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          className: student.className,
+          email: student.user?.email,
           averageScore: Math.round((ts._avg.percentage || 0) * 100) / 100,
           examsTaken: ts._count.id,
         };
       })
-    );
+    )).filter(Boolean);
 
     // 5. Recently active exams (published exams with results in the last 30 days)
     const thirtyDaysAgo = new Date();

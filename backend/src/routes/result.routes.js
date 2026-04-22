@@ -181,14 +181,14 @@ router.get('/student', authenticate, requireRole('STUDENT'), async (req, res) =>
 
     // Hide scores for non-IMMEDIATE visibility exams
     const sanitized = results.map(r => {
-      const showScores = r.exam.resultVisibility === 'IMMEDIATE';
+      const showScores = r.exam?.resultVisibility === 'IMMEDIATE';
       return {
         id: r.id,
         examId: r.examId,
         submittedAt: r.submittedAt,
         examStartTime: r.examStartTime,
         examEndTime: r.examEndTime,
-        exam: r.exam,
+        exam: r.exam || { title: 'Deleted Exam', subject: '', className: '', type: '', duration: 0, resultVisibility: 'MANUAL', passMark: 50 },
         showScores,
         ...(showScores ? {
           score: r.score,
@@ -221,6 +221,21 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
 
     if (!result) {
       return res.status(404).json({ success: false, message: 'Result not found.' });
+    }
+
+    // Guard: if exam was deleted, return basic info only
+    if (!result.exam) {
+      return res.status(200).json({
+        success: true,
+        result: {
+          id: result.id,
+          submittedAt: result.submittedAt,
+          examStartTime: result.examStartTime,
+          examEndTime: result.examEndTime,
+          showScores: false,
+          showDetails: false,
+        },
+      });
     }
 
     // MANUAL mode: hide all scores and answers from students
@@ -425,11 +440,17 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
       return res.status(404).json({ success: false, message: 'No results found for this exam.' });
     }
 
+    // Filter out results with deleted students (prevent crash on export)
+    const validResults = results.filter(r => r.student);
+    if (validResults.length === 0) {
+      return res.status(404).json({ success: false, message: 'No valid student records found for export.' });
+    }
+
     // CSV format
     if (format === 'csv') {
       const filename = `${exam.title.replace(/[^a-zA-Z0-9]/g, '_')}_results`;
       const headers = ['Admission No', 'First Name', 'Last Name', 'Class', 'Score', 'Total Marks', 'Percentage', 'Time Spent (min)', 'Exam Start Time', 'Exam End Time', 'Submitted At'];
-      const rows = results.map(r => [
+      const rows = validResults.map(r => [
         r.student.admissionNo,
         r.student.firstName,
         r.student.lastName,
@@ -485,8 +506,8 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER'), async (req, 
       doc.restore();
     };
 
-    // For each result, generate a PDF page
-    for (const result of results) {
+    // For each valid result, generate a PDF page
+    for (const result of validResults) {
       doc.addPage();
       drawWatermark();
 
