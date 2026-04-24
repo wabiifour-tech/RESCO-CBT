@@ -7,7 +7,7 @@ import DailyDevotional from './DailyDevotional';
 import {
   LogOut, BookOpen, Plus, Upload, Eye, Edit3, Trash2, Download, ChevronDown, ChevronUp,
   X, Users, BarChart3, CheckCircle, Clock, FileText, AlertCircle, Sparkles, Trophy, Target,
-  ChevronLeft, ChevronRight, GraduationCap, Award, Star, ClipboardList, TrendingUp
+  ChevronLeft, ChevronRight, GraduationCap, Award, Star, ClipboardList, TrendingUp, Lock
 } from 'lucide-react';
 
 const SUBJECT_ICONS = ['📘', '🧮', '🧪', '🌍', '📝', '🎨', '🎵', '💻', '🔬', '📐'];
@@ -73,6 +73,8 @@ export default function TeacherDashboard() {
   const [dlLoading, setDlLoading] = useState(false);
   const [dlPreview, setDlPreview] = useState(null);
   const [schoolLogo, setSchoolLogo] = useState(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
   const fetchData = useCallback(async () => {
     try {
@@ -138,11 +140,34 @@ export default function TeacherDashboard() {
   }, [dlExamId]);
   useEffect(() => { fetchDlPreview(); }, [fetchDlPreview]);
 
-  useEffect(() => {
+    useEffect(() => {
     api.get('/settings/logo').then(res => {
       if (res.data && res.data.logo) setSchoolLogo(res.data.logo);
     }).catch(() => {});
   }, []);
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters');
+      return;
+    }
+    try {
+      const res = await api.post('/auth/change-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      toast.success(res.data.message || 'Password changed successfully!');
+      setShowPasswordModal(false);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to change password');
+    }
+  };
 
   const handleDownloadPDF = async () => {
     if (!dlExamId) { toast.error('Please select an exam'); return; }
@@ -349,6 +374,9 @@ export default function TeacherDashboard() {
             <div className="flex items-center gap-3">
               <LiveClock compact />
               <span className="text-sm text-gray-600">Hello, <b>{user?.teacher?.firstName || user?.email}</b></span>
+              <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-indigo-500 transition-colors" title="Change Password">
+                <Lock className="w-5 h-5" />
+              </button>
               <button onClick={() => { logout(); window.location.href = '/'; }} className="text-gray-400 hover:text-red-500">
                 <LogOut className="w-5 h-5" />
               </button>
@@ -554,6 +582,7 @@ export default function TeacherDashboard() {
             <div className="flex items-center gap-3">
               <LiveClock compact />
               <span className="text-sm text-gray-600 hidden sm:inline">{getGreeting()}, <b>{user?.teacher?.firstName || user?.email}</b></span>
+              <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-indigo-500 transition-colors hidden sm:inline-flex" title="Change Password"><Lock className="w-5 h-5" /></button>
               <button onClick={() => { logout(); window.location.href = '/'; }} className="text-gray-400 hover:text-red-500"><LogOut className="w-5 h-5" /></button>
             </div>
           </div>
@@ -762,6 +791,13 @@ export default function TeacherDashboard() {
             <span className="text-sm text-gray-600 hidden sm:inline">
               {getGreeting()}, <b>{user?.teacher?.firstName || user?.email}</b>
             </span>
+            <button
+              onClick={() => setShowPasswordModal(true)}
+              className="text-gray-400 hover:text-indigo-500 transition-colors"
+              title="Change Password"
+            >
+              <Lock className="w-5 h-5" />
+            </button>
             <button onClick={() => { logout(); window.location.href = '/'; }} className="text-gray-400 hover:text-red-500 transition-colors">
               <LogOut className="w-5 h-5" />
             </button>
@@ -1467,6 +1503,67 @@ export default function TeacherDashboard() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PASSWORD CHANGE MODAL */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full relative">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <Lock className="w-5 h-5 text-white" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white">Change Password</h2>
+                </div>
+                <button onClick={() => { setShowPasswordModal(false); setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' }); }} className="text-white/70 hover:text-white transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <form onSubmit={handleChangePassword} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                <input
+                  type="password" required
+                  value={passwordForm.currentPassword}
+                  onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  className="input-field" placeholder="Enter current password"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <input
+                  type="password" required minLength={6}
+                  value={passwordForm.newPassword}
+                  onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  className="input-field" placeholder="Enter new password (min 6 chars)"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                <input
+                  type="password" required minLength={6}
+                  value={passwordForm.confirmPassword}
+                  onChange={e => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  className="input-field" placeholder="Confirm new password"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowPasswordModal(false); setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' }); }}
+                  className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                >Cancel</button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-indigo-700 shadow-lg transition-all"
+                >Update Password</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
