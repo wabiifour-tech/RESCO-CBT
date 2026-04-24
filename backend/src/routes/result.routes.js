@@ -24,7 +24,7 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
     // Verify exam is published and accessible
     const exam = await prisma.exam.findUnique({
       where: { id: examId },
-      select: { id: true, title: true, status: true, subject: true, className: true, resultVisibility: true, endDate: true, passMark: true },
+      select: { id: true, title: true, status: true, subject: true, className: true, resultVisibility: true, endDate: true, passMark: true, duration: true },
     });
 
     if (!exam) {
@@ -42,6 +42,20 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
 
     if (existingResult) {
       return res.status(400).json({ success: false, message: 'You have already submitted this exam.' });
+    }
+
+    // Enforce exam duration — reject submission if time exceeded (with 60s grace)
+    const startTimeRaw = examStartTime ? new Date(examStartTime) : null;
+    if (startTimeRaw && !isNaN(startTimeRaw.getTime()) && exam.duration > 0) {
+      const maxAllowedMs = (exam.duration + 1) * 60 * 1000; // duration + 1 min grace
+      const elapsedMs = now.getTime() - startTimeRaw.getTime();
+      if (elapsedMs > maxAllowedMs) {
+        return res.status(403).json({
+          success: false,
+          message: 'Exam time has expired. Your submission was not accepted.',
+          timeExceeded: true,
+        });
+      }
     }
 
     // Get all questions for this exam
@@ -85,7 +99,6 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
     const percentage = totalMarks > 0 ? (score / totalMarks) * 100 : 0;
     const passed = percentage >= exam.passMark;
 
-    const startTimeRaw = examStartTime ? new Date(examStartTime) : now;
     const startTime = (startTimeRaw instanceof Date && !isNaN(startTimeRaw.getTime())) ? startTimeRaw : now;
 
     // Create result and answers in transaction

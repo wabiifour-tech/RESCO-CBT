@@ -29,7 +29,22 @@ const useAuthStore = create((set) => ({
     try {
       const user = JSON.parse(localStorage.getItem('resco_user') || 'null');
       const token = localStorage.getItem('resco_token');
-      if (user && token) set({ user, token, isAuthenticated: true });
+      if (user && token) {
+        // Check if JWT token is expired
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload.exp && payload.exp * 1000 < Date.now()) {
+            // Token expired — clear storage and don't authenticate
+            console.warn('JWT token expired, clearing session.');
+            localStorage.removeItem('resco_user');
+            localStorage.removeItem('resco_token');
+            return;
+          }
+        } catch (decodeErr) {
+          // If we can't decode the token, let it through — the server will reject invalid tokens
+        }
+        set({ user, token, isAuthenticated: true });
+      }
     } catch (e) {
       console.warn('Failed to load auth from storage, clearing:', e.message);
       localStorage.removeItem('resco_user');

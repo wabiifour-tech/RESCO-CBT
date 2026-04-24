@@ -172,6 +172,14 @@ export default function LoginPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Show session expired toast if redirected due to 401
+  useEffect(() => {
+    if (window.__resco_session_expired) {
+      window.__resco_session_expired = false;
+      toast.error('Session expired. Please log in again.', { duration: 4000 });
+    }
+  }, []);
+
   const triggerShake = () => {
     setShaking(true);
     setTimeout(() => setShaking(false), 600);

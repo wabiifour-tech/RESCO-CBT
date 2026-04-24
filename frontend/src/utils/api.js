@@ -27,7 +27,14 @@ api.interceptors.response.use(
         localStorage.removeItem('resco_token');
         localStorage.removeItem('resco_user');
       } catch (e) { /* ignore */ }
-      if (window.location.pathname !== '/') window.location.href = '/';
+      // Show session expired notification before redirecting
+      if (typeof window !== 'undefined') {
+        window.__resco_session_expired = true;
+      }
+      // Delay redirect slightly so the toast can be seen
+      setTimeout(() => {
+        if (window.location.pathname !== '/') window.location.href = '/';
+      }, 1000);
     }
     return Promise.reject(error);
   }

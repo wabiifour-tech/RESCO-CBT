@@ -181,6 +181,52 @@ router.patch('/:id/publish', authenticate, requireRole('TEACHER', 'PRINCIPAL'), 
   }
 });
 
+// Delete Exam (DRAFT only) — TEACHER, PRINCIPAL
+router.delete('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const where = { id };
+    if (req.user.role !== 'PRINCIPAL' && req.user.role !== 'ADMIN') {
+      where.teacherId = req.user.userId;
+    }
+
+    const exam = await prisma.exam.findFirst({
+      where,
+      include: { _count: { select: { questions: true, results: true } } },
+    });
+
+    if (!exam) {
+      return res.status(404).json({ success: false, message: 'Exam not found or not yours.' });
+    }
+
+    if (exam.status !== 'DRAFT' && exam.status !== 'ARCHIVED') {
+      return res.status(400).json({ success: false, message: 'Only DRAFT or ARCHIVED exams can be deleted. Published exams with results cannot be deleted.' });
+    }
+
+    // Delete exam and all related records in a transaction
+    await prisma.$transaction(async (tx) => {
+      await tx.resultAnswer.deleteMany({
+        where: { result: { examId: id } },
+      });
+      await tx.result.deleteMany({
+        where: { examId: id },
+      });
+      await tx.examQuestion.deleteMany({
+        where: { examId: id },
+      });
+      await tx.exam.delete({
+        where: { id },
+      });
+    });
+
+    res.json({ success: true, message: 'Exam deleted successfully.' });
+  } catch (error) {
+    console.error('Delete exam error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete exam.' });
+  }
+});
+
 // Archive Exam — TEACHER, PRINCIPAL, ADMIN
 router.patch('/:id/archive', authenticate, requireRole('TEACHER', 'ADMIN', 'PRINCIPAL'), async (req, res) => {
   try {
