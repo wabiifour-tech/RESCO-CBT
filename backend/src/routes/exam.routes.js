@@ -55,11 +55,31 @@ router.post('/', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, 
 router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) => {
   try {
     const { status } = req.query;
-    const where = {
-      teacherId: req.user.userId,
-    };
+
+    // Get teacher's class assignments so we can also show exams assigned to their classes
+    const classAssignments = await prisma.teacherClass.findMany({
+      where: { teacherId: req.user.userId },
+      select: { className: true, subject: true },
+    });
+
+    const assignedClassNames = [...new Set(classAssignments.map(ca => ca.className))];
+    const assignedSubjects = [...new Set(classAssignments.map(ca => ca.subject))];
+
+    // Build where clause: show exams created by this teacher OR exams that match their class+subject assignments
+    const orConditions = [{ teacherId: req.user.userId }];
+
+    if (assignedClassNames.length > 0) {
+      orConditions.push({
+        teacherId: { not: req.user.userId },
+        className: { in: assignedClassNames },
+      });
+    }
+
+    const where = { OR: orConditions };
+
     if (status) {
-      where.status = status;
+      // Apply status filter inside each OR condition
+      where.OR = where.OR.map(condition => ({ ...condition, status }));
     }
 
     const exams = await prisma.exam.findMany({
@@ -82,12 +102,20 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
         subject: true,
         createdAt: true,
         updatedAt: true,
+        teacherId: true,
+        teacher: { select: { firstName: true, lastName: true } },
         _count: { select: { questions: true, results: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json({ success: true, exams });
+    // Mark exams not created by this teacher as "assigned"
+    const examsWithOwner = exams.map(exam => ({
+      ...exam,
+      isOwner: exam.teacherId === req.user.userId,
+    }));
+
+    res.json({ success: true, exams: examsWithOwner });
   } catch (error) {
     console.error('Get teacher exams error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch exams.' });

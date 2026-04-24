@@ -103,7 +103,7 @@ export default function AdminPanel() {
   const [examQuestions, setExamQuestions] = useState([]);
   const [selectedExamInfo, setSelectedExamInfo] = useState(null);
   const [showExamModal, setShowExamModal] = useState(false);
-  const [examForm, setExamForm] = useState({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE' });
+  const [examForm, setExamForm] = useState({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE', teacherId: '' });
 
   // Search
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -428,7 +428,7 @@ export default function AdminPanel() {
       const res = await api.post('/admin/exams/create', examForm);
       toast.success(res.data.message);
       setShowExamModal(false);
-      setExamForm({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE' });
+      setExamForm({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE', teacherId: '' });
       fetchAllExams();
       fetchDraftExams();
     } catch (err) {
@@ -1789,7 +1789,7 @@ export default function AdminPanel() {
             <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>Manage Exams</h2>
             <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0 0' }}>Create exams and manage their lifecycle</p>
           </div>
-          <button onClick={() => setShowExamModal(true)} style={{ ...btnGrad, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}><Plus size={16} /> Create Exam</button>
+          <button onClick={() => { fetchTeachers(); setShowExamModal(true); }} style={{ ...btnGrad, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}><Plus size={16} /> Create Exam</button>
         </div>
 
         {listContent}
@@ -1801,6 +1801,18 @@ export default function AdminPanel() {
               <button onClick={() => setShowExamModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={20} /></button>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 20px 0' }}>Create New Exam</h2>
               <form onSubmit={handleCreateExam} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Assign to Teacher *</label>
+                  <select required value={examForm.teacherId} onChange={(e) => setExamForm({ ...examForm, teacherId: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}>
+                    <option value="">-- Select a Teacher --</option>
+                    {teachers.filter(t => t.status === 'ACTIVE').map(t => (
+                      <option key={t.id} value={t.id}>{t.firstName} {t.lastName} ({t.username})</option>
+                    ))}
+                  </select>
+                  {teachers.filter(t => t.status === 'ACTIVE').length === 0 && (
+                    <p style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>No active teachers. Create and activate a teacher first.</p>
+                  )}
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Subject *</label>
