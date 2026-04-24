@@ -953,10 +953,12 @@ router.get('/analytics', async (req, res) => {
     });
 
     // 4. Top performing students
+    // NOTE: prisma groupBy does not support `include` or `select` — use only
+    // aggregation fields (_avg, _count, etc.) and fetch related data separately.
     const topStudents = await prisma.result.groupBy({
       by: ['studentId'],
       _avg: { percentage: true },
-      _count: { id: true },
+      _count: { _all: true },
       orderBy: {
         _avg: { percentage: 'desc' },
       },
@@ -979,7 +981,7 @@ router.get('/analytics', async (req, res) => {
           className: student.className,
           email: student.user?.email,
           averageScore: Math.round((ts._avg.percentage || 0) * 100) / 100,
-          examsTaken: ts._count.id,
+          examsTaken: ts._count._all,
         };
       })
     )).filter(Boolean);
