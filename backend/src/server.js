@@ -56,6 +56,24 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('dev'));
 
 // ========================================
+// Public Routes
+// ========================================
+
+// Public school logo endpoint (no auth required)
+app.get('/api/settings/logo', async (req, res) => {
+  try {
+    let setting = await prisma.settings.findUnique({ where: { key: 'school_logo' } });
+    if (!setting) {
+      return res.status(404).json({ error: 'No custom logo set' });
+    }
+    res.json({ logo: setting.value });
+  } catch (error) {
+    console.error('[Get Public Logo Error]', error);
+    res.status(500).json({ error: 'Failed to get logo' });
+  }
+});
+
+// ========================================
 // API Routes
 // ========================================
 

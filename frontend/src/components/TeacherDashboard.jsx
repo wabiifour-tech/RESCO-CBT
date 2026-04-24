@@ -72,6 +72,7 @@ export default function TeacherDashboard() {
   const [dlExamId, setDlExamId] = useState('');
   const [dlLoading, setDlLoading] = useState(false);
   const [dlPreview, setDlPreview] = useState(null);
+  const [schoolLogo, setSchoolLogo] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -136,6 +137,12 @@ export default function TeacherDashboard() {
     } catch { toast.error('Failed to load preview'); }
   }, [dlExamId]);
   useEffect(() => { fetchDlPreview(); }, [fetchDlPreview]);
+
+  useEffect(() => {
+    api.get('/settings/logo').then(res => {
+      if (res.data && res.data.logo) setSchoolLogo(res.data.logo);
+    }).catch(() => {});
+  }, []);
 
   const handleDownloadPDF = async () => {
     if (!dlExamId) { toast.error('Please select an exam'); return; }
@@ -689,31 +696,54 @@ export default function TeacherDashboard() {
   // MAIN DASHBOARD VIEW
   // ========================
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      {/* School Logo Watermark */}
-      <div className="resco-watermark">
-        <img src="/resco-logo.png" alt="" />
+    <>
+      {/* School Name Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
+        padding: '12px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 16,
+      }}>
+        {schoolLogo && (
+          <img src={schoolLogo} alt="School Logo" style={{ height: 40, width: 40, objectFit: 'contain', borderRadius: 8 }} />
+        )}
+        <div style={{ textAlign: 'center' }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#ffffff', letterSpacing: 0.5 }}>
+            REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO
+          </h1>
+          <p style={{ margin: '2px 0 0 0', fontSize: 12, color: '#c7d2fe', fontWeight: 500 }}>
+            Computer-Based Test Platform
+          </p>
+        </div>
       </div>
 
-      <style>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-8px); }
-        }
-        @keyframes gradientMove {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        .anim-fade-in { animation: fadeInUp 0.6s ease-out both; }
-        .anim-float { animation: float 3s ease-in-out infinite; }
-        .anim-gradient { background-size: 200% 200%; animation: gradientMove 4s ease infinite; }
-        .card-enter { animation: fadeInUp 0.5s ease-out both; }
-      `}</style>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
+        {/* School Logo Watermark */}
+        <div className="resco-watermark">
+          <img src="/resco-logo.png" alt="" />
+        </div>
+
+        <style>{`
+          @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+          }
+          @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+          .anim-fade-in { animation: fadeInUp 0.6s ease-out both; }
+          .anim-float { animation: float 3s ease-in-out infinite; }
+          .anim-gradient { background-size: 200% 200%; animation: gradientMove 4s ease infinite; }
+          .card-enter { animation: fadeInUp 0.5s ease-out both; }
+        `}</style>
 
       {/* Header */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-10">
@@ -1493,6 +1523,7 @@ export default function TeacherDashboard() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

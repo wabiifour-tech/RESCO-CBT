@@ -178,6 +178,7 @@ export default function PrincipalDashboard() {
   const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' });
 
   // Logo management
+  const [schoolLogo, setSchoolLogo] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [showLogoModal, setShowLogoModal] = useState(false);
@@ -208,6 +209,7 @@ export default function PrincipalDashboard() {
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [teacherSaving, setTeacherSaving] = useState(false);
   const [teacherForm, setTeacherForm] = useState({ firstName: '', lastName: '', username: '', password: '' });
+  const [teacherClassAssignments, setTeacherClassAssignments] = useState([{ className: 'JSS1', subject: '' }]);
 
   // Student creation
   const [showStudentModal, setShowStudentModal] = useState(false);
@@ -535,20 +537,23 @@ export default function PrincipalDashboard() {
   // ─── Teacher CRUD Handlers ──────────────────────────────────────────────
   const handleCreateTeacher = async (e) => {
     e.preventDefault();
-    if (!teacherForm.firstName || !teacherForm.lastName || !teacherForm.username || !teacherForm.password) {
-      toast.error('All fields are required');
-      return;
-    }
-    setTeacherSaving(true);
+    const validAssignments = teacherClassAssignments.filter(a => a.className && a.subject);
     try {
-      await api.post('/principal/teachers/create', teacherForm);
-      toast.success('Teacher created successfully!');
+      await api.post('/principal/teachers/create', {
+        firstName: teacherForm.firstName,
+        lastName: teacherForm.lastName,
+        username: teacherForm.username,
+        password: teacherForm.password,
+        classAssignments: validAssignments,
+      });
+      toast.success('Teacher created successfully');
       setShowTeacherModal(false);
       setTeacherForm({ firstName: '', lastName: '', username: '', password: '' });
+      setTeacherClassAssignments([{ className: 'JSS1', subject: '' }]);
       fetchTeachers();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create teacher');
-    } finally { setTeacherSaving(false); }
+    }
   };
 
   const handleDeleteTeacher = async (teacherId) => {
@@ -593,6 +598,12 @@ export default function PrincipalDashboard() {
   };
 
   // ─── Logo Management ─────────────────────────────────────────────────
+  useEffect(() => {
+    api.get('/principal/settings/logo').then(res => {
+      if (res.data && res.data.logo) setSchoolLogo(res.data.logo);
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     api.get('/principal/settings/logo').then(() => {
       setLogoPreview('/api/principal/settings/logo');
@@ -1917,6 +1928,28 @@ export default function PrincipalDashboard() {
 
   // ─── Main Render ────────────────────────────────────────────────────────
   return (
+    <>
+    {/* School Name Header */}
+    <div style={{
+      background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
+      padding: '12px 24px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 16,
+    }}>
+      {schoolLogo && (
+        <img src={schoolLogo} alt="School Logo" style={{ height: 40, width: 40, objectFit: 'contain', borderRadius: 8 }} />
+      )}
+      <div style={{ textAlign: 'center' }}>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#ffffff', letterSpacing: 0.5 }}>
+          REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO
+        </h1>
+        <p style={{ margin: '2px 0 0 0', fontSize: 12, color: '#c7d2fe', fontWeight: 500 }}>
+          Computer-Based Test Platform
+        </p>
+      </div>
+    </div>
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
       <style>{KEYFRAMES}</style>
       {/* Logo Background Watermark */}
@@ -1998,6 +2031,60 @@ export default function PrincipalDashboard() {
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Password *</label>
                   <input type="password" value={teacherForm.password} onChange={(ev) => setTeacherForm({ ...teacherForm, password: ev.target.value })} placeholder="Min 6 characters" style={inputStyle} required minLength={6} />
                 </div>
+              </div>
+              {/* Class & Subject Assignments */}
+              <div style={{ marginTop: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Class & Subject Assignments
+                </label>
+                {teacherClassAssignments.map((assignment, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                    <select
+                      value={assignment.className}
+                      onChange={(e) => {
+                        const updated = [...teacherClassAssignments];
+                        updated[idx] = { ...updated[idx], className: e.target.value };
+                        setTeacherClassAssignments(updated);
+                      }}
+                      style={selectStyle}
+                    >
+                      {['JSS1','JSS2','JSS3','SSS1','SSS2','SSS3'].map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Subject (e.g. Mathematics)"
+                      value={assignment.subject}
+                      onChange={(e) => {
+                        const updated = [...teacherClassAssignments];
+                        updated[idx] = { ...updated[idx], subject: e.target.value };
+                        setTeacherClassAssignments(updated);
+                      }}
+                      style={{ flex: 1, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#374151', background: '#fff', outline: 'none' }}
+                    />
+                    {teacherClassAssignments.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setTeacherClassAssignments(teacherClassAssignments.filter((_, i) => i !== idx))}
+                        style={{ padding: '8px', borderRadius: 8, border: '1px solid #fecaca', background: '#fee2e2', color: '#991b1b', cursor: 'pointer', fontSize: 16, fontWeight: 700, lineHeight: 1 }}
+                      >
+                        -
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setTeacherClassAssignments([...teacherClassAssignments, { className: 'JSS1', subject: '' }])}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '6px 14px', borderRadius: 8, border: '1px dashed #d1d5db',
+                    background: '#f9fafb', color: '#6b7280', cursor: 'pointer', fontSize: 13, fontWeight: 500,
+                  }}
+                >
+                  <Plus size={14} /> Add Class
+                </button>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
                 <button type="button" onClick={() => setShowTeacherModal(false)} style={secondaryBtn}>Cancel</button>
@@ -2087,5 +2174,6 @@ export default function PrincipalDashboard() {
         </div>
       )}
     </div>
+    </>
   );
 }

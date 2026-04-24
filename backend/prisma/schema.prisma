@@ -37,17 +37,30 @@ model Student {
 }
 
 model Teacher {
-  id        String  @id @default(uuid())
-  firstName String  @map("first_name")
-  lastName  String  @map("last_name")
-  username  String  @unique
-  status    String  @default("ACTIVE")
-  subjects  String  @default("[]")
+  id        String        @id @default(uuid())
+  firstName String        @map("first_name")
+  lastName  String        @map("last_name")
+  username  String        @unique
+  status    String        @default("ACTIVE")
+  subjects  String        @default("[]")
 
-  user   User   @relation(fields: [id], references: [id], onDelete: Cascade)
-  exams  Exam[]
+  user         User          @relation(fields: [id], references: [id], onDelete: Cascade)
+  exams        Exam[]
+  classAssignments TeacherClass[]
 
   @@map("teachers")
+}
+
+model TeacherClass {
+  id        Int     @id @default(autoincrement())
+  teacherId String  @map("teacher_id")
+  className String  @map("class_name")
+  subject   String
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, className, subject])
+  @@map("teacher_classes")
 }
 
 model Exam {

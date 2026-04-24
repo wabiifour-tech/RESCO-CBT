@@ -321,6 +321,7 @@ router.get('/teachers', async (req, res) => {
         include: {
           user: { select: { email: true, createdAt: true } },
           _count: { select: { exams: true } },
+          classAssignments: true,
         },
       }),
       prisma.teacher.count({ where }),
@@ -335,6 +336,7 @@ router.get('/teachers', async (req, res) => {
         email: t.user?.email || 'N/A',
         status: t.status,
         subjects: (() => { try { return JSON.parse(t.subjects || '[]'); } catch (_) { return []; } })(),
+        classAssignments: t.classAssignments ? t.classAssignments.map(ca => ({ className: ca.className, subject: ca.subject })) : [],
         createdAt: t.user?.createdAt || null,
         examCount: t._count.exams,
       })),
@@ -769,9 +771,21 @@ router.get('/results/export/:examId', async (req, res) => {
 // ============================================================
 router.post('/teachers/create', async (req, res) => {
   try {
-    const { firstName, lastName, username, password } = req.body;
+    const { firstName, lastName, username, password, classAssignments } = req.body;
     if (!firstName || !lastName || !username || !password) {
       return res.status(400).json({ success: false, message: 'Missing required fields: firstName, lastName, username, password' });
+    }
+    // Validate classAssignments if provided
+    if (classAssignments && Array.isArray(classAssignments)) {
+      for (let i = 0; i < classAssignments.length; i++) {
+        const ca = classAssignments[i];
+        if (!ca.className || !ca.subject) {
+          return res.status(400).json({
+            success: false,
+            message: `classAssignments[${i}]: each item must have className and subject`,
+          });
+        }
+      }
     }
     const trimmedUsername = username.trim().toLowerCase();
     if (password.length < 6) {
@@ -782,21 +796,37 @@ router.post('/teachers/create', async (req, res) => {
       return res.status(409).json({ success: false, message: 'A teacher with this username already exists' });
     }
     const generatedEmail = `${trimmedUsername}@resco.local`;
+    // Build subjects array from unique subjects in classAssignments
+    const subjectsArray = classAssignments && Array.isArray(classAssignments)
+      ? [...new Set(classAssignments.map(ca => ca.subject.trim()))]
+      : [];
+
     const teacher = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: { email: generatedEmail, password: password, role: 'TEACHER' },
       });
-      return tx.teacher.create({
+      const createdTeacher = await tx.teacher.create({
         data: {
           id: user.id,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           username: trimmedUsername,
           status: 'ACTIVE',
-          subjects: '[]',
+          subjects: JSON.stringify(subjectsArray),
         },
         include: { user: { select: { email: true, createdAt: true } } },
       });
+      // Create TeacherClass records if classAssignments provided
+      if (classAssignments && Array.isArray(classAssignments) && classAssignments.length > 0) {
+        await tx.teacherClass.createMany({
+          data: classAssignments.map(ca => ({
+            teacherId: user.id,
+            className: ca.className.trim(),
+            subject: ca.subject.trim(),
+          })),
+        });
+      }
+      return createdTeacher;
     });
     res.status(201).json({
       success: true,
@@ -839,6 +869,7 @@ router.delete('/teachers/:id', async (req, res) => {
         await tx.examQuestion.deleteMany({ where: { examId: { in: examIds } } });
         await tx.exam.deleteMany({ where: { teacherId: id } });
       }
+      await tx.teacherClass.deleteMany({ where: { teacherId: id } });
       await tx.teacher.delete({ where: { id } });
       await tx.user.delete({ where: { id } });
     });

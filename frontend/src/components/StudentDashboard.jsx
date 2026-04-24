@@ -154,6 +154,7 @@ export default function StudentDashboard() {
   const [keyMaps, setKeyMaps] = useState({});
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [schoolLogo, setSchoolLogo] = useState(null);
 
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
@@ -239,6 +240,12 @@ export default function StudentDashboard() {
         clearInterval(timerRef.current);
       }
     };
+  }, []);
+
+  useEffect(function () {
+    api.get('/settings/logo').then(function (res) {
+      if (res.data && res.data.logo) setSchoolLogo(res.data.logo);
+    }).catch(function () {});
   }, []);
 
   const startExam = async function (examId) {
@@ -941,7 +948,30 @@ export default function StudentDashboard() {
   // VIEW 1: DASHBOARD / EXAM LIST
   // ========================
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
+    <>
+      {/* School Name Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
+        padding: '12px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 16,
+      }}>
+        {schoolLogo && (
+          <img src={schoolLogo} alt="School Logo" style={{ height: 40, width: 40, objectFit: 'contain', borderRadius: 8 }} />
+        )}
+        <div style={{ textAlign: 'center' }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#ffffff', letterSpacing: 0.5 }}>
+            REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO
+          </h1>
+          <p style={{ margin: '2px 0 0 0', fontSize: 12, color: '#c7d2fe', fontWeight: 500 }}>
+            Computer-Based Test Platform
+          </p>
+        </div>
+      </div>
+
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
       {/* School Logo Watermark */}
       <div className="resco-watermark">
         <img src="/resco-logo.png" alt="" />
@@ -1383,6 +1413,7 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

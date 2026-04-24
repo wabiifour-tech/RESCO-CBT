@@ -128,6 +128,7 @@ export default function AdminPanel() {
 
   // Form data
   const [teacherForm, setTeacherForm] = useState({ firstName: '', lastName: '', username: '', password: '' });
+  const [teacherClassAssignments, setTeacherClassAssignments] = useState([{ className: 'JSS1', subject: '' }]);
   const [studentForm, setStudentForm] = useState({ firstName: '', lastName: '', admissionNo: '', className: '', email: '', password: '' });
 
   // Results tab state
@@ -151,6 +152,9 @@ export default function AdminPanel() {
   const [editPasswordModal, setEditPasswordModal] = useState(false);
   const [editPasswordUser, setEditPasswordUser] = useState(null);
   const [newPassword, setNewPassword] = useState('');
+
+  // School logo
+  const [schoolLogo, setSchoolLogo] = useState(null);
 
   // ─── Fetch helpers ─────────────────────────────────────────────────────────
   const fetchDashboard = useCallback(async () => {
@@ -284,6 +288,13 @@ export default function AdminPanel() {
     }).catch(() => { setResPreview(null); });
   }, [activeTab, resExamId]);
 
+  // ─── Fetch school logo ──────────────────────────────────────────────────────
+  useEffect(() => {
+    api.get('/admin/settings/logo').then(res => {
+      if (res.data && res.data.logo) setSchoolLogo(res.data.logo);
+    }).catch(() => {});
+  }, []);
+
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleLogout = () => {
     logout();
@@ -293,16 +304,20 @@ export default function AdminPanel() {
 
   const handleCreateTeacher = async (e) => {
     e.preventDefault();
+    // Filter out empty assignments
+    const validAssignments = teacherClassAssignments.filter(a => a.className && a.subject);
     try {
       await api.post('/admin/teachers/create', {
         firstName: teacherForm.firstName,
         lastName: teacherForm.lastName,
         username: teacherForm.username,
         password: teacherForm.password,
+        classAssignments: validAssignments,
       });
       toast.success('Teacher created successfully');
       setShowTeacherModal(false);
       setTeacherForm({ firstName: '', lastName: '', username: '', password: '' });
+      setTeacherClassAssignments([{ className: 'JSS1', subject: '' }]);
       fetchTeachers();
     } catch (err) {
       toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to create teacher');
@@ -1320,6 +1335,60 @@ export default function AdminPanel() {
             <option value="REJECTED">Rejected</option>
           </select>
         </div>
+        {/* Class & Subject Assignments */}
+        <div style={{ marginTop: 16 }}>
+          <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+            Class & Subject Assignments
+          </label>
+          {teacherClassAssignments.map((assignment, idx) => (
+            <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+              <select
+                value={assignment.className}
+                onChange={(e) => {
+                  const updated = [...teacherClassAssignments];
+                  updated[idx] = { ...updated[idx], className: e.target.value };
+                  setTeacherClassAssignments(updated);
+                }}
+                style={selectStyle}
+              >
+                {['JSS1','JSS2','JSS3','SSS1','SSS2','SSS3'].map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Subject (e.g. Mathematics)"
+                value={assignment.subject}
+                onChange={(e) => {
+                  const updated = [...teacherClassAssignments];
+                  updated[idx] = { ...updated[idx], subject: e.target.value };
+                  setTeacherClassAssignments(updated);
+                }}
+                style={{ flex: 1, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#374151', background: '#fff', outline: 'none' }}
+              />
+              {teacherClassAssignments.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setTeacherClassAssignments(teacherClassAssignments.filter((_, i) => i !== idx))}
+                  style={{ padding: '8px', borderRadius: 8, border: '1px solid #fecaca', background: '#fee2e2', color: '#991b1b', cursor: 'pointer', fontSize: 16, fontWeight: 700, lineHeight: 1 }}
+                >
+                  -
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setTeacherClassAssignments([...teacherClassAssignments, { className: 'JSS1', subject: '' }])}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '6px 14px', borderRadius: 8, border: '1px dashed #d1d5db',
+              background: '#f9fafb', color: '#6b7280', cursor: 'pointer', fontSize: 13, fontWeight: 500,
+            }}
+          >
+            <Plus size={14} /> Add Class
+          </button>
+        </div>
         <button
           type="submit"
           style={submitButton('linear-gradient(135deg, #6366f1, #8b5cf6)', 'rgba(99,102,241,0.35)')}
@@ -2197,6 +2266,28 @@ export default function AdminPanel() {
 
   // ─── Main Layout ────────────────────────────────────────────────────────────
   return (
+    <>
+    {/* School Name Header */}
+    <div style={{
+      background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
+      padding: '12px 24px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 16,
+    }}>
+      {schoolLogo && (
+        <img src={schoolLogo} alt="School Logo" style={{ height: 40, width: 40, objectFit: 'contain', borderRadius: 8 }} />
+      )}
+      <div style={{ textAlign: 'center' }}>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#ffffff', letterSpacing: 0.5 }}>
+          REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO
+        </h1>
+        <p style={{ margin: '2px 0 0 0', fontSize: 12, color: '#c7d2fe', fontWeight: 500 }}>
+          Computer-Based Test Platform
+        </p>
+      </div>
+    </div>
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9' }}>
       {/* Inject global keyframes */}
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
@@ -2480,5 +2571,6 @@ export default function AdminPanel() {
       {renderTeacherModal()}
       {renderStudentModal()}
     </div>
+    </>
   );
 }
