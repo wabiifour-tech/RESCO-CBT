@@ -309,11 +309,28 @@ router.get('/teacher', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async 
 
     const where = {};
     if (req.user.role === 'TEACHER') {
-      where.exam = { teacherId: req.user.userId };
+      // Teachers can see results for exams they created OR exams assigned to their classes
+      const classAssignments = await prisma.teacherClass.findMany({
+        where: { teacherId: req.user.userId },
+        select: { className: true },
+      });
+      const assignedClasses = [...new Set(classAssignments.map(ca => ca.className))];
+      const examWhere = [{ teacherId: req.user.userId }];
+      if (assignedClasses.length > 0) {
+        examWhere.push({ className: { in: assignedClasses } });
+      }
+      where.exam = { OR: examWhere };
     }
 
     if (examId) where.examId = examId;
-    if (className) where.student = { className };
+    if (className) {
+      if (where.exam) {
+        // Merge className filter with existing exam filter
+        where.student = { className };
+      } else {
+        where.student = { className };
+      }
+    }
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const take = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
@@ -372,14 +389,27 @@ router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER', 'PRI
   try {
     const { examId } = req.params;
 
+    // Teachers can access exams they created OR exams assigned to their classes
     const where = { id: examId };
     if (req.user.role === 'TEACHER') {
-      where.teacherId = req.user.userId;
+      const classAssignments = await prisma.teacherClass.findMany({
+        where: { teacherId: req.user.userId },
+        select: { className: true },
+      });
+      const assignedClasses = [...new Set(classAssignments.map(ca => ca.className))];
+      const orConditions = [{ teacherId: req.user.userId }];
+      if (assignedClasses.length > 0) {
+        orConditions.push({ className: { in: assignedClasses } });
+      }
+      where.OR = orConditions;
+      delete where.id;
+      // We need to keep examId as a filter
+      where.id = examId;
     }
     const exam = await prisma.exam.findFirst({ where });
 
     if (!exam) {
-      return res.status(404).json({ success: false, message: 'Exam not found or not yours.' });
+      return res.status(404).json({ success: false, message: 'Exam not found or not assigned to you.' });
     }
 
     const results = await prisma.result.findMany({
@@ -433,10 +463,21 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'),
     const { examId } = req.params;
     const { format } = req.query;
 
-    // Verify exam exists; PRINCIPAL can export any exam, TEACHER only their own
+    // Verify exam exists; PRINCIPAL can export any exam, TEACHER can export their own or class-assigned
     const where = { id: examId };
     if (req.user.role === 'TEACHER') {
-      where.teacherId = req.user.userId;
+      const classAssignments = await prisma.teacherClass.findMany({
+        where: { teacherId: req.user.userId },
+        select: { className: true },
+      });
+      const assignedClasses = [...new Set(classAssignments.map(ca => ca.className))];
+      const orConditions = [{ teacherId: req.user.userId }];
+      if (assignedClasses.length > 0) {
+        orConditions.push({ className: { in: assignedClasses } });
+      }
+      where.OR = orConditions;
+      delete where.id;
+      where.id = examId;
     }
     const exam = await prisma.exam.findFirst({
       where,
@@ -446,7 +487,7 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'),
     });
 
     if (!exam) {
-      return res.status(404).json({ success: false, message: 'Exam not found or not yours.' });
+      return res.status(404).json({ success: false, message: 'Exam not found or not assigned to you.' });
     }
 
     const results = await prisma.result.findMany({
