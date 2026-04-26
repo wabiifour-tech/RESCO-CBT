@@ -9,7 +9,7 @@ import {
   LogOut, BookOpen, Users, UserCheck, UserX, UserPlus, BarChart3, Trash2,
   X, Eye, Shield, GraduationCap, TrendingUp, Clock, CheckCircle, XCircle,
   Search, Download, Settings, ChevronRight, Sparkles, School, Award,
-  Upload, FileQuestion, Plus, Minus, Menu, Calendar, Edit3
+  Upload, FileQuestion, Plus, Minus, Menu, Calendar, Edit3, Lock
 } from 'lucide-react';
 
 // ─── Color Maps (avoid template-literal classNames) ────────────────────────────
@@ -156,6 +156,11 @@ export default function AdminPanel() {
   // School logo
   const [schoolLogo, setSchoolLogo] = useState(null);
 
+  // Self change password
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [pwChanging, setPwChanging] = useState(false);
+
   // ─── Fetch helpers ─────────────────────────────────────────────────────────
   const fetchDashboard = useCallback(async () => {
     try {
@@ -206,7 +211,7 @@ export default function AdminPanel() {
     setLoading(true);
     try {
       const res = await api.get('/admin/questions/exams');
-      setDraftExams(res.data || []);
+      setDraftExams(Array.isArray(res.data) ? res.data : (res.data?.exams || []));
     } catch (err) {
       toast.error('Failed to load exams');
     } finally {
@@ -590,6 +595,24 @@ export default function AdminPanel() {
       fetchUsers();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update password');
+    }
+  };
+
+  const handleChangeOwnPassword = async (e) => {
+    e.preventDefault();
+    if (!pwForm.currentPassword || !pwForm.newPassword) { toast.error('All fields are required'); return; }
+    if (pwForm.newPassword.length < 6) { toast.error('New password must be at least 6 characters'); return; }
+    if (pwForm.newPassword !== pwForm.confirmPassword) { toast.error('New passwords do not match'); return; }
+    setPwChanging(true);
+    try {
+      const res = await api.post('/auth/change-password', { currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword });
+      toast.success(res.data.message || 'Password changed successfully!');
+      setShowPasswordModal(false);
+      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to change password');
+    } finally {
+      setPwChanging(false);
     }
   };
 
@@ -2213,7 +2236,7 @@ export default function AdminPanel() {
                       <td style={{ padding: '12px 16px' }}>{roleBadge(u.role)}</td>
                       <td style={{ padding: '12px 16px' }}>
                         <code style={{ padding: '4px 10px', borderRadius: 6, background: u.isHashed ? '#fef2f2' : '#f0fdf4', color: u.isHashed ? '#991b1b' : '#166534', fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>
-                          {u.isHashed ? '(hashed)' : u.password}
+                          {'••••••'}
                         </code>
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
@@ -2247,11 +2270,35 @@ export default function AdminPanel() {
               </div>
               <form onSubmit={handleEditPassword}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>New Password</label>
-                <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password (min 6 chars)"
+                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password (min 6 chars)"
                   style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', marginBottom: 16 }} autoFocus />
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                   <button type="button" onClick={() => setEditPasswordModal(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, border: '1.5px solid #d1d5db', background: '#fff', color: '#6b7280', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
                   <button type="submit" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}>Update Password</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Self Change Password Modal */}
+        {showPasswordModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, animation: 'fadeIn 0.2s ease both' }} onClick={() => setShowPasswordModal(false)}>
+            <div style={{ background: '#fff', borderRadius: 20, padding: 28, maxWidth: 440, width: '92%', boxShadow: '0 25px 60px rgba(0,0,0,0.2)', animation: 'scaleIn 0.3s ease both' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0 }}>Change Your Password</h3>
+                <button onClick={() => setShowPasswordModal(false)} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: '#f1f5f9', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={18} /></button>
+              </div>
+              <form onSubmit={handleChangeOwnPassword}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Current Password</label>
+                <input type="password" value={pwForm.currentPassword} onChange={(e) => setPwForm({ ...pwForm, currentPassword: e.target.value })} placeholder="Enter current password" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', marginBottom: 14 }} autoFocus />
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>New Password</label>
+                <input type="password" value={pwForm.newPassword} onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })} placeholder="Enter new password (min 6 chars)" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', marginBottom: 14 }} />
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Confirm New Password</label>
+                <input type="password" value={pwForm.confirmPassword} onChange={(e) => setPwForm({ ...pwForm, confirmPassword: e.target.value })} placeholder="Confirm new password" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', marginBottom: 18 }} />
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setShowPasswordModal(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, border: '1.5px solid #d1d5db', background: '#fff', color: '#6b7280', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                  <button type="submit" disabled={pwChanging} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, border: 'none', background: pwChanging ? '#94a3b8' : 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: pwChanging ? 'not-allowed' : 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}>{pwChanging ? 'Changing...' : 'Update Password'}</button>
                 </div>
               </form>
             </div>
@@ -2496,6 +2543,22 @@ export default function AdminPanel() {
           <div style={{ marginBottom: 10 }}>
             <LiveClock compact />
           </div>
+
+          {/* Change Password */}
+          <button
+            onClick={() => { setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' }); setShowPasswordModal(true); }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              width: '100%', padding: '10px 16px', borderRadius: 10,
+              border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(99,102,241,0.1)',
+              color: '#c7d2fe', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+              transition: 'all 0.2s ease', marginBottom: 8,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(99,102,241,0.25)'; e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; e.currentTarget.style.color = '#c7d2fe'; }}
+          >
+            <Lock size={16} /> Change Password
+          </button>
 
           {/* Logout */}
           <button

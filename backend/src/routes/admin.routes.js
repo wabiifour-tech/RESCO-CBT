@@ -1182,7 +1182,7 @@ router.post('/exams/create', async (req, res) => {
         passMark: !isNaN(parseInt(passMark, 10)) ? parseInt(passMark, 10) : 50,
         startDate: startDate || '',
         endDate: endDate || '',
-        resultVisibility: resultVisibility || 'IMMEDIATE',
+        resultVisibility: resultVisibility || 'MANUAL',
         className: className.trim(),
         subject: subject.trim(),
         teacherId: targetTeacherId,
@@ -1327,9 +1327,13 @@ router.delete('/exams/:id', async (req, res) => {
     if (!exam) return res.status(404).json({ error: 'Exam not found.' });
     if (exam.status === 'PUBLISHED') return res.status(400).json({ error: 'Cannot delete a published exam. Archive it first.' });
 
-    // Delete questions first, then exam
-    await prisma.examQuestion.deleteMany({ where: { examId: req.params.id } });
-    await prisma.exam.delete({ where: { id: req.params.id } });
+    // Delete questions, result answers, results, then exam
+    await prisma.$transaction(async (tx) => {
+      await tx.resultAnswer.deleteMany({ where: { question: { examId: req.params.id } } });
+      await tx.result.deleteMany({ where: { examId: req.params.id } });
+      await tx.examQuestion.deleteMany({ where: { examId: req.params.id } });
+      await tx.exam.delete({ where: { id: req.params.id } });
+    });
     res.json({ message: 'Exam deleted successfully.' });
   } catch (error) {
     console.error('[Admin Delete Exam Error]', error);

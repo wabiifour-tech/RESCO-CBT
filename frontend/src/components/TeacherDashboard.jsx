@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import useAuthStore from '../store/authStore';
 import toast from 'react-hot-toast';
@@ -39,6 +40,7 @@ function getGreeting() {
 
 export default function TeacherDashboard() {
   const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [exams, setExams] = useState([]);
   const [results, setResults] = useState([]);
@@ -377,7 +379,7 @@ export default function TeacherDashboard() {
               <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-indigo-500 transition-colors" title="Change Password">
                 <Lock className="w-5 h-5" />
               </button>
-              <button onClick={() => { logout(); window.location.href = '/'; }} className="text-gray-400 hover:text-red-500">
+              <button onClick={() => { logout(); toast.success('Logged out successfully'); navigate('/'); }} className="text-gray-400 hover:text-red-500">
                 <LogOut className="w-5 h-5" />
               </button>
             </div>
@@ -583,7 +585,7 @@ export default function TeacherDashboard() {
               <LiveClock compact />
               <span className="text-sm text-gray-600 hidden sm:inline">{getGreeting()}, <b>{user?.teacher?.firstName || user?.email}</b></span>
               <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-indigo-500 transition-colors hidden sm:inline-flex" title="Change Password"><Lock className="w-5 h-5" /></button>
-              <button onClick={() => { logout(); window.location.href = '/'; }} className="text-gray-400 hover:text-red-500"><LogOut className="w-5 h-5" /></button>
+              <button onClick={() => { logout(); toast.success('Logged out successfully'); navigate('/'); }} className="text-gray-400 hover:text-red-500"><LogOut className="w-5 h-5" /></button>
             </div>
           </div>
         </header>
@@ -798,7 +800,7 @@ export default function TeacherDashboard() {
             >
               <Lock className="w-5 h-5" />
             </button>
-            <button onClick={() => { logout(); window.location.href = '/'; }} className="text-gray-400 hover:text-red-500 transition-colors">
+            <button onClick={() => { logout(); toast.success('Logged out successfully'); navigate('/'); }} className="text-gray-400 hover:text-red-500 transition-colors">
               <LogOut className="w-5 h-5" />
             </button>
           </div>

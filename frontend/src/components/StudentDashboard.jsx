@@ -161,6 +161,7 @@ export default function StudentDashboard() {
   const answersRef = useRef({});
   const questionsRef = useRef([]);
   const examDetailRef = useRef(null);
+  const hasSubmittedRef = useRef(false);
 
   const studentName = (user && user.student && (user.student.firstName || user.student.lastName))
     ? (user.student.firstName + ' ' + (user.student.lastName || '')).trim()
@@ -228,10 +229,11 @@ export default function StudentDashboard() {
 
   // Auto-submit when timer reaches zero (separate effect avoids calling async inside state updater)
   useEffect(function () {
-    if (view === 'exam' && timeLeft === 0 && !examResult && !submitting) {
+    if (view === 'exam' && timeLeft === 0 && !hasSubmittedRef.current && !examResult) {
+      hasSubmittedRef.current = true;
       doSubmitExam();
     }
-  }, [view, timeLeft, examResult, submitting]);
+  }, [view, timeLeft, examResult]);
 
   // Cleanup timer on unmount
   useEffect(function () {
@@ -272,6 +274,7 @@ export default function StudentDashboard() {
       startTimeRef.current = Date.now();
       if (examStartTime) startTimeRef.current = new Date(examStartTime).getTime();
       setExamResult(null);
+      hasSubmittedRef.current = false;
       setView('exam');
     } catch (err) {
       toast.error(err.response && err.response.data && err.response.data.message ? err.response.data.message : 'Failed to load exam');
@@ -374,11 +377,9 @@ export default function StudentDashboard() {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });
-      if (res.data.success) {
-        toast.success('Password changed successfully!');
-        setShowPasswordModal(false);
-        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      }
+      toast.success(res.data.message || 'Password changed successfully!');
+      setShowPasswordModal(false);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to change password');
     }

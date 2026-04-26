@@ -179,7 +179,6 @@ export default function PrincipalDashboard() {
 
   // Logo management
   const [schoolLogo, setSchoolLogo] = useState(null);
-  const [logoPreview, setLogoPreview] = useState(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [showLogoModal, setShowLogoModal] = useState(false);
 
@@ -604,14 +603,7 @@ export default function PrincipalDashboard() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    api.get('/principal/settings/logo').then(() => {
-      setLogoPreview('/api/principal/settings/logo');
-    }).catch(() => {
-      setLogoPreview(null);
-    });
-  }, []);
-
+  
   const handleLogoUpload = async (e) => {
     e.preventDefault();
     const fileInput = e.target.querySelector('input[type="file"]');
@@ -622,7 +614,6 @@ export default function PrincipalDashboard() {
       formData.append('logo', fileInput.files[0]);
       await api.post('/principal/settings/logo', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success('Logo uploaded successfully!');
-      setLogoPreview('/api/principal/settings/logo');
       setShowLogoModal(false);
       window.location.reload();
     } catch (err) {
@@ -635,7 +626,6 @@ export default function PrincipalDashboard() {
     try {
       await api.delete('/principal/settings/logo');
       toast.success('Logo reset to default');
-      setLogoPreview(null);
       setShowLogoModal(false);
       window.location.reload();
     } catch (err) {
@@ -671,7 +661,7 @@ export default function PrincipalDashboard() {
 
   const filteredExams = exams.filter((e) => {
     const q = examSearch.toLowerCase();
-    return e.title.toLowerCase().includes(q) || e.subject.toLowerCase().includes(q) || e.className.toLowerCase().includes(q);
+    return (e.title || '').toLowerCase().includes(q) || (e.subject || '').toLowerCase().includes(q) || (e.className || '').toLowerCase().includes(q);
   }).filter((e) => !examStatusFilter || e.status === examStatusFilter);
 
   // ─── Render helpers ─────────────────────────────────────────────────────
@@ -709,7 +699,7 @@ export default function PrincipalDashboard() {
       <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(245,158,11,0.4)', overflow: 'hidden', padding: 4 }}>
-            <img src={logoPreview || '/resco-logo.png'} alt="RESCO" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            <img src={schoolLogo || '/resco-logo.png'} alt="RESCO" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <div>
             <h2 style={{ fontSize: 13, fontWeight: 800, color: '#fff', margin: 0 }}>REDEEMER'S SCHOOLS AND COLLEGE, OWOTORO</h2>
@@ -1898,7 +1888,7 @@ export default function PrincipalDashboard() {
               </div>
               <form onSubmit={handleEditPassword}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>New Password</label>
-                <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password (min 6 chars)"
+                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password (min 6 chars)"
                   style={{ ...inputStyle, marginBottom: 16 }} autoFocus />
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                   <button type="button" onClick={() => setEditPasswordModal(false)} style={{ ...secondaryBtn, borderColor: '#d1d5db', color: '#6b7280' }}>Cancel</button>
@@ -2158,7 +2148,7 @@ export default function PrincipalDashboard() {
             </div>
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <div style={{ width: 100, height: 100, borderRadius: 16, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', overflow: 'hidden', border: '2px dashed #d1d5db' }}>
-                <img src={logoPreview || '/resco-logo.png'} alt="Current Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                <img src={schoolLogo || '/resco-logo.png'} alt="Current Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
               <p style={{ fontSize: 13, color: '#64748b' }}>Current Logo</p>
             </div>

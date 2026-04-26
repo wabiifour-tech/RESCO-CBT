@@ -35,6 +35,15 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
       return res.status(400).json({ success: false, message: 'This exam is not available.' });
     }
 
+    // Verify student belongs to the exam's class
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      select: { className: true },
+    });
+    if (exam.className && student && student.className && exam.className !== student.className) {
+      return res.status(403).json({ success: false, message: 'You are not authorized to take this exam. Class mismatch.' });
+    }
+
     // Check student hasn't already submitted
     const existingResult = await prisma.result.findUnique({
       where: { examId_studentId: { examId, studentId } },
