@@ -264,17 +264,24 @@ export default function PrincipalDashboard() {
     finally { setLoading(false); }
   }, []);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (searchTerm) => {
     setUsersLoading(true);
     try {
       const params = {};
       if (usersRoleFilter) params.role = usersRoleFilter;
-      if (usersSearch) params.search = usersSearch;
+      if (searchTerm) params.search = searchTerm;
       const res = await api.get('/principal/users', { params });
       setUsers(res.data.users || []);
     } catch (err) { toast.error('Failed to load users'); }
     finally { setUsersLoading(false); }
-  }, [usersRoleFilter, usersSearch]);
+  }, [usersRoleFilter]);
+
+  // Debounced search for users
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    const timer = setTimeout(() => { fetchUsers(usersSearch); }, 400);
+    return () => clearTimeout(timer);
+  }, [activeTab, usersSearch, fetchUsers]);
 
   useEffect(() => {
     if (activeTab === 'dashboard') fetchDashboard();
@@ -282,7 +289,7 @@ export default function PrincipalDashboard() {
     else if (activeTab === 'teachers') fetchTeachers();
     else if (activeTab === 'students') fetchStudents();
     else if (activeTab === 'exams') fetchExams();
-    else if (activeTab === 'users') fetchUsers();
+    else if (activeTab === 'users') fetchUsers(usersSearch);
   }, [activeTab, fetchDashboard, fetchAnalytics, fetchTeachers, fetchStudents, fetchExams, fetchUsers]);
 
   // Results cascading filters
@@ -823,10 +830,10 @@ export default function PrincipalDashboard() {
         {/* Extra Stats Row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginTop: 24 }}>
           {[
-            { label: 'Avg. Score', value: dashboard.averageScore + '%', icon: Target, color: '#6366f1' },
-            { label: 'Total Questions', value: dashboard.totalQuestions, icon: FileText, color: '#10b981' },
-            { label: 'Draft Exams', value: dashboard.draftExams, icon: ClipboardList, color: '#f59e0b' },
-            { label: 'New This Week', value: dashboard.recentRegistrations, icon: Sparkles, color: '#ec4899' },
+            { label: 'Avg. Score', value: (dashboard.averageScore ?? 0) + '%', icon: Target, color: '#6366f1' },
+            { label: 'Total Questions', value: dashboard.totalQuestions ?? 0, icon: FileText, color: '#10b981' },
+            { label: 'Draft Exams', value: dashboard.draftExams ?? 0, icon: ClipboardList, color: '#f59e0b' },
+            { label: 'New This Week', value: dashboard.recentRegistrations ?? 0, icon: Sparkles, color: '#ec4899' },
           ].map((item, idx) => {
             const Icon = item.icon;
             return (
@@ -1006,7 +1013,7 @@ export default function PrincipalDashboard() {
                         {s.averageScore}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 14px', fontWeight: 600, color: '#1e293b' }}>{s.firstName} {s.lastName}</td>
+                    <td style={{ padding: '10px 14px', fontWeight: 600, color: '#1e293b' }}>{s.firstName || ''} {s.lastName || ''}</td>
                     <td style={{ padding: '10px 14px', color: '#374151', fontFamily: 'monospace', fontSize: 13 }}>{s.admissionNo}</td>
                     <td style={{ padding: '10px 14px' }}>
                       <span style={{ padding: '3px 10px', borderRadius: 6, background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 600 }}>{s.className}</span>
@@ -1096,7 +1103,7 @@ export default function PrincipalDashboard() {
                     {(t.firstName || '?')[0] + (t.lastName || '')[0]}
                   </div>
                   <div>
-                    <p style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>{t.firstName} {t.lastName}</p>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', margin: 0 }}>{t.firstName || ''} {t.lastName || ''}</p>
                     <p style={{ fontSize: 13, color: '#64748b', margin: '2px 0 0' }}>@{t.username}</p>
                   </div>
                 </div>
@@ -1162,7 +1169,7 @@ export default function PrincipalDashboard() {
               {filteredStudents.map((s, idx) => (
                 <tr key={s.id || idx} style={{ borderBottom: '1px solid #f1f5f9', animation: 'fadeInUp 0.3s ease ' + (idx * 0.03) + 's both' }}>
                   <td style={{ padding: '12px 16px', color: '#64748b', fontWeight: 600 }}>{idx + 1}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#1e293b' }}>{s.firstName} {s.lastName}</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#1e293b' }}>{s.firstName || ''} {s.lastName || ''}</td>
                   <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: 13, color: '#374151' }}>{s.admissionNo}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <span style={{ padding: '3px 10px', borderRadius: 6, background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 600 }}>{s.className}</span>

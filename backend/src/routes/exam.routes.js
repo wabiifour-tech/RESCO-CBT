@@ -19,6 +19,12 @@ router.post('/', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, 
       return res.status(400).json({ success: false, message: 'Missing required fields.' });
     }
 
+    const VALID_VISIBILITY = ['IMMEDIATE', 'MANUAL', 'AFTER_CLOSE'];
+    const vis = resultVisibility || 'MANUAL';
+    if (!VALID_VISIBILITY.includes(vis)) {
+      return res.status(400).json({ success: false, message: 'Invalid resultVisibility. Must be one of: ' + VALID_VISIBILITY.join(', ') });
+    }
+
     const exam = await prisma.exam.create({
       data: {
         title,
@@ -29,7 +35,7 @@ router.post('/', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, 
         passMark: !isNaN(parseInt(passMark, 10)) ? parseInt(passMark, 10) : 25,
         startDate: String(startDate || ''),
         endDate: String(endDate || ''),
-        resultVisibility: resultVisibility || 'MANUAL',
+        resultVisibility: vis,
         shuffleQuestions: shuffleQuestions === true ? 1 : 0,
         shuffleOptions: shuffleOptions === true ? 1 : 0,
         className: className.trim(),
@@ -270,6 +276,13 @@ router.patch('/:id/archive', authenticate, requireRole('TEACHER', 'ADMIN', 'PRIN
 
     if (!exam) {
       return res.status(404).json({ success: false, message: 'Exam not found or not yours.' });
+    }
+
+    if (exam.status === 'DRAFT') {
+      return res.status(400).json({ success: false, message: 'Cannot archive a draft exam. Delete it instead.' });
+    }
+    if (exam.status === 'ARCHIVED') {
+      return res.status(400).json({ success: false, message: 'Exam is already archived.' });
     }
 
     const archived = await prisma.exam.update({

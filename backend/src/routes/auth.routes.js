@@ -104,14 +104,6 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // If password was bcrypt-hashed, migrate to plaintext for faster future logins
-    if (isBcryptHash) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { password: password },
-      });
-    }
-
     // Block teachers who are not active
     if (user.role === 'TEACHER' && user.teacher && user.teacher.status === 'PENDING') {
       return res.status(403).json({

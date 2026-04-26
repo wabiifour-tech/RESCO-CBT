@@ -1175,7 +1175,7 @@ export default function TeacherDashboard() {
 
       {/* CREATE EXAM MODAL */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowCreate(false); }}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative">
             {/* Modal Header */}
             <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5 rounded-t-2xl">
@@ -1333,7 +1333,7 @@ export default function TeacherDashboard() {
 
       {/* ADD QUESTIONS MODAL — Table-based Inline Editor */}
       {showAddQuestions && selectedExam && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowAddQuestions(false); }}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-[96vw] w-[96vw] max-h-[92vh] overflow-y-auto relative">
             {/* Modal Header */}
             <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-5 rounded-t-2xl sticky top-0 z-10">
@@ -1511,7 +1511,7 @@ export default function TeacherDashboard() {
 
       {/* PASSWORD CHANGE MODAL */}
       {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowPasswordModal(false); }}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full relative">
             <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5 rounded-t-2xl">
               <div className="flex items-center justify-between">
@@ -1572,7 +1572,7 @@ export default function TeacherDashboard() {
 
       {/* CSV UPLOAD MODAL */}
       {showUpload && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowUpload(false); }}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full relative">
             {/* Modal Header */}
             <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-5 rounded-t-2xl">

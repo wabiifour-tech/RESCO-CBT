@@ -254,7 +254,18 @@ export default function StudentDashboard() {
     try {
       const res = await api.get('/exams/' + examId + '/questions');
       const exam = res.data.exam;
-      const qs = res.data.questions;
+      const qs = (res.data.questions || []).map(q => {
+        if (Array.isArray(q.options)) return q;
+        return {
+          ...q,
+          options: [
+            { key: 'A', text: q.optionA || '' },
+            { key: 'B', text: q.optionB || '' },
+            { key: 'C', text: q.optionC || '' },
+            { key: 'D', text: q.optionD || '' },
+          ],
+        };
+      });
       const examStartTime = res.data.examStartTime;
 
       if (!exam || !qs || !Array.isArray(qs) || qs.length === 0) {
@@ -368,6 +379,10 @@ export default function StudentDashboard() {
 
   const handleChangePassword = async function (e) {
     e.preventDefault();
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters');
+      return;
+    }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast.error('New passwords do not match');
       return;
@@ -517,11 +532,11 @@ export default function StudentDashboard() {
               <div className="px-8 pb-6 result-slide" style={{ animationDelay: '0.6s' }}>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 text-center border border-blue-200">
-                    <p className="text-2xl font-bold text-blue-700">{examResult.score}</p>
+                    <p className="text-2xl font-bold text-blue-700">{examResult.score ?? '—'}</p>
                     <p className="text-xs text-blue-500 font-medium mt-1">Marks Obtained</p>
                   </div>
                   <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-4 text-center border border-purple-200">
-                    <p className="text-2xl font-bold text-purple-700">{examResult.totalMarks}</p>
+                    <p className="text-2xl font-bold text-purple-700">{examResult.totalMarks ?? '—'}</p>
                     <p className="text-xs text-purple-500 font-medium mt-1">Total Marks</p>
                   </div>
                   <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl p-4 text-center border border-pink-200">

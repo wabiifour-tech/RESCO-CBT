@@ -64,7 +64,15 @@ function validateQuestion(q, index) {
 }
 
 // Multer for logo uploads (images only)
-const logoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only image files (PNG, JPG, GIF, WebP) are allowed'));
+  },
+});
 
 // All admin routes require authentication and ADMIN role
 router.use(authenticate, requireRole('ADMIN'));
@@ -251,6 +259,8 @@ router.post('/teachers/create', async (req, res) => {
           email: generatedEmail,
           password: password,
           role: 'TEACHER',
+          firstName: trimmedFirstName,
+          lastName: trimmedLastName,
         },
       });
 
@@ -862,7 +872,7 @@ router.get('/analytics', async (req, res) => {
     const allResults = await prisma.result.findMany({
       include: {
         student: { select: { className: true } },
-        exam: { select: { subject: true, className: true } },
+        exam: { select: { subject: true, className: true, passMark: true } },
       },
     });
 
@@ -965,13 +975,17 @@ router.get('/analytics', async (req, res) => {
       take: 20,
     });
 
-    const topStudentsData = (await Promise.all(
-      topStudents.map(async (ts) => {
-        const student = await prisma.student.findUnique({
-          where: { id: ts.studentId },
-          include: { user: { select: { email: true } } },
-        });
-        // Skip if student was deleted
+    const studentIds = topStudents.map(ts => ts.studentId);
+    const studentsMap = {};
+    const studentRecords = await prisma.student.findMany({
+      where: { id: { in: studentIds } },
+      include: { user: { select: { email: true } } },
+    });
+    studentRecords.forEach(s => { studentsMap[s.id] = s; });
+
+    const topStudentsData = topStudents
+      .map(ts => {
+        const student = studentsMap[ts.studentId];
         if (!student) return null;
         return {
           studentId: ts.studentId,
@@ -984,7 +998,7 @@ router.get('/analytics', async (req, res) => {
           examsTaken: ts._count._all,
         };
       })
-    )).filter(Boolean);
+      .filter(Boolean);
 
     // 5. Recently active exams (published exams with results in the last 30 days)
     const thirtyDaysAgo = new Date();
@@ -1588,7 +1602,15 @@ router.post('/questions/manual', async (req, res) => {
       else validationErrors.push(...result.errors);
     }
     if (validQuestions.length === 0) return res.status(400).json({ error: 'No valid questions.', errors: validationErrors });
-    const created = await prisma.$transaction(validQuestions.map(q => prisma.examQuestion.create({ data: q })));
+    let created = [];
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < validQuestions.length; i += BATCH_SIZE) {
+      const batch = validQuestions.slice(i, i + BATCH_SIZE);
+      const batchCreated = await prisma.$transaction(
+        batch.map(q => prisma.examQuestion.create({ data: q }))
+      );
+      created = created.concat(batchCreated);
+    }
     res.status(201).json({ success: true, message: `${created.length} question(s) created.`, data: { count: created.length, examId }, ...(validationErrors.length > 0 && { warnings: { errors: validationErrors } }) });
   } catch (error) {
     console.error('[Admin Manual Questions Error]', error);
@@ -1982,6 +2004,16 @@ router.get('/users', async (req, res) => {
         { email: { contains: term } },
         { firstName: { contains: term } },
         { lastName: { contains: term } },
+        { teacher: { OR: [
+          { firstName: { contains: term } },
+          { lastName: { contains: term } },
+          { username: { contains: term } },
+        ]}},
+        { student: { OR: [
+          { firstName: { contains: term } },
+          { lastName: { contains: term } },
+          { admissionNo: { contains: term } },
+        ]}},
       ];
     }
 
@@ -2006,8 +2038,7 @@ router.get('/users', async (req, res) => {
         role: u.role,
         firstName: u.firstName,
         lastName: u.lastName,
-        password: u.password.startsWith('$2') ? '(hashed - reset to set new)' : u.password,
-        isHashed: u.password.startsWith('$2'),
+
         admissionNo: u.student?.admissionNo || null,
         className: u.student?.className || null,
         teacherUsername: u.teacher?.username || null,

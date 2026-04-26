@@ -244,17 +244,24 @@ export default function AdminPanel() {
     }
   }, []);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (searchTerm) => {
     setUsersLoading(true);
     try {
       const params = {};
       if (usersRoleFilter) params.role = usersRoleFilter;
-      if (usersSearch) params.search = usersSearch;
+      if (searchTerm) params.search = searchTerm;
       const res = await api.get('/admin/users', { params });
       setUsers(res.data.users || []);
     } catch (err) { toast.error('Failed to load users'); }
     finally { setUsersLoading(false); }
-  }, [usersRoleFilter, usersSearch]);
+  }, [usersRoleFilter]);
+
+  // Debounced search for users
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    const timer = setTimeout(() => { fetchUsers(usersSearch); }, 400);
+    return () => clearTimeout(timer);
+  }, [activeTab, usersSearch, fetchUsers]);
 
   // Load data when tab changes
   useEffect(() => {
@@ -264,7 +271,7 @@ export default function AdminPanel() {
     else if (activeTab === 'analytics') fetchAnalytics();
     else if (activeTab === 'questions') fetchDraftExams();
     else if (activeTab === 'exams') fetchAllExams();
-    else if (activeTab === 'users') fetchUsers();
+    else if (activeTab === 'users') fetchUsers(usersSearch);
   }, [activeTab, fetchDashboard, fetchTeachers, fetchStudents, fetchAnalytics, fetchDraftExams, fetchAllExams, fetchUsers]);
 
   // ─── Results: fetch filter options ───────────────────────────────────────────
@@ -580,7 +587,7 @@ export default function AdminPanel() {
     a.href = url;
     a.download = 'question_template.csv';
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const handleEditPassword = async (e) => {
@@ -1344,8 +1351,7 @@ export default function AdminPanel() {
         </div>
         <div>
           <label style={labelStyle}>Status</label>
-          <select
-            onChange={(e) => setTeacherForm({ ...teacherForm, status: e.target.value })}
+          <select value={teacherForm.status || 'PENDING'} onChange={(e) => setTeacherForm({ ...teacherForm, status: e.target.value })}
             style={{
               ...inputStyle,
               cursor: 'pointer',

@@ -7,7 +7,15 @@ const { requireRole } = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only image files (PNG, JPG, GIF, WebP) are allowed'));
+  },
+});
 
 // All principal routes require authentication and PRINCIPAL role
 router.use(authenticate, requireRole('PRINCIPAL'));
@@ -168,11 +176,16 @@ router.get('/analytics', async (req, res) => {
       take: 20,
     });
 
-    const topStudents = (await Promise.all(
-      topStudentAgg.map(async (ts) => {
-        const student = await prisma.student.findUnique({
-          where: { id: ts.studentId },
-        });
+    const studentIds = topStudentAgg.map(ts => ts.studentId);
+    const studentsMap = {};
+    const studentRecords = await prisma.student.findMany({
+      where: { id: { in: studentIds } },
+    });
+    studentRecords.forEach(s => { studentsMap[s.id] = s; });
+
+    const topStudents = topStudentAgg
+      .map(ts => {
+        const student = studentsMap[ts.studentId];
         if (!student) return null;
         return {
           studentId: ts.studentId,
@@ -184,7 +197,7 @@ router.get('/analytics', async (req, res) => {
           examsTaken: ts._count.id,
         };
       })
-    )).filter(Boolean);
+      .filter(Boolean);
 
     // 5. Recent exam activity (last 30 days)
     const thirtyDaysAgo = new Date();
@@ -644,11 +657,16 @@ router.get('/results/export/:examId', async (req, res) => {
       return res.status(404).json({ error: 'No results found for this exam' });
     }
 
+    const validResults = results.filter(r => r.student);
+    if (validResults.length === 0) {
+      return res.status(404).json({ error: 'No valid student records found.' });
+    }
+
     // CSV format
     if (format === 'csv') {
       const filename = `${exam.title.replace(/[^a-zA-Z0-9]/g, '_')}_Results`;
       const headers = ['Rank', 'Admission No', 'First Name', 'Last Name', 'Class', 'Score', 'Total Marks', 'Percentage', 'Status', 'Time Spent (min)', 'Submitted At'];
-      const ranked = results.map((r, idx) => {
+      const ranked = validResults.map((r, idx) => {
         const pct = Math.round(r.percentage * 100) / 100;
         const status = pct >= exam.passMark ? 'PASS' : 'FAIL';
         return [
@@ -666,7 +684,7 @@ router.get('/results/export/:examId', async (req, res) => {
         ];
       });
 
-      const csv = [headers.join(','), ...ranked.map(row => row.join(','))].join('\n');
+      const csv = [headers.join(','), ...ranked.map(row => row.map(v => { const s = String(v ?? ''); return `"${s.replace(/"/g, '""')}"`; }).join(','))].join('\n');
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
       return res.send(csv);
@@ -701,7 +719,7 @@ router.get('/results/export/:examId', async (req, res) => {
     doc.moveDown(0.8);
 
     // Results Table
-    const ranked = results.map((r, idx) => {
+    const ranked = validResults.map((r, idx) => {
       const pct = Math.round(r.percentage * 100) / 100;
       const status = pct >= exam.passMark ? 'PASS' : 'FAIL';
       return { ...r, rank: idx + 1, pct, status };
@@ -757,7 +775,9 @@ router.get('/results/export/:examId', async (req, res) => {
     doc.end();
   } catch (error) {
     console.error('[Principal Export Results Error]', error);
-    res.status(500).json({ error: 'Failed to export results' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to export results.' });
+    }
   }
 });
 
@@ -803,7 +823,7 @@ router.post('/teachers/create', async (req, res) => {
 
     const teacher = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { email: generatedEmail, password: password, role: 'TEACHER' },
+        data: { email: generatedEmail, password: password, role: 'TEACHER', firstName: firstName.trim(), lastName: lastName.trim() },
       });
       const createdTeacher = await tx.teacher.create({
         data: {
@@ -1076,6 +1096,16 @@ router.get('/users', async (req, res) => {
         { email: { contains: term } },
         { firstName: { contains: term } },
         { lastName: { contains: term } },
+        { teacher: { OR: [
+          { firstName: { contains: term } },
+          { lastName: { contains: term } },
+          { username: { contains: term } },
+        ]}},
+        { student: { OR: [
+          { firstName: { contains: term } },
+          { lastName: { contains: term } },
+          { admissionNo: { contains: term } },
+        ]}},
       ];
     }
 
@@ -1100,8 +1130,6 @@ router.get('/users', async (req, res) => {
         role: u.role,
         firstName: u.firstName,
         lastName: u.lastName,
-        password: u.password.startsWith('$2') ? '(hashed - reset to set new)' : u.password,
-        isHashed: u.password.startsWith('$2'),
         admissionNo: u.student?.admissionNo || null,
         className: u.student?.className || null,
         teacherUsername: u.teacher?.username || null,

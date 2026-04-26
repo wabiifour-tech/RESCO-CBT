@@ -104,7 +104,7 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
       };
     });
 
-    const totalMarks = questions.reduce((sum, q) => sum + q.marks, 0);
+    const totalMarks = exam.totalMarks || questions.reduce((sum, q) => sum + q.marks, 0);
     const percentage = totalMarks > 0 ? (score / totalMarks) * 100 : 0;
     const passed = percentage >= exam.passMark;
 
@@ -281,6 +281,19 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
       const endDate = result.exam?.endDate;
       const hasEnd = endDate && !isNaN(new Date(endDate).getTime());
       const passMark = result.exam?.passMark || 50;
+      if (!hasEnd) {
+        // No valid end date set — treat as MANUAL (hide scores)
+        return res.status(200).json({
+          success: true,
+          result: {
+            id: result.id,
+            submittedAt: result.submittedAt,
+            examStartTime: result.examStartTime,
+            examEndTime: result.examEndTime,
+            showScore: false,
+          },
+        });
+      }
       if (hasEnd && new Date(endDate) > new Date()) {
         return res.status(200).json({
           success: true,
@@ -360,24 +373,24 @@ router.get('/teacher', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async 
     ]);
 
     // Summary stats
-    const allResults = await prisma.result.findMany({
+    const stats = await prisma.result.aggregate({
       where,
-      select: { score: true, totalMarks: true, percentage: true, exam: { select: { passMark: true } } },
+      _avg: { percentage: true },
+      _max: { percentage: true },
+      _min: { percentage: true },
+      _count: true,
     });
 
-    const avgScore = allResults.length > 0 ? allResults.reduce((s, r) => s + r.percentage, 0) / allResults.length : 0;
-    const highest = allResults.length > 0 ? Math.max(...allResults.map(r => r.percentage)) : 0;
-    const lowest = allResults.length > 0 ? Math.min(...allResults.map(r => r.percentage)) : 0;
-    const passRate = allResults.length > 0 ? (allResults.filter(r => r.percentage >= (r.exam?.passMark || 50)).length / allResults.length) * 100 : 0;
+    const passRate = stats._count > 0 ? (await prisma.result.count({ where: { ...where, percentage: { gte: 50 } } }) / stats._count) * 100 : 0;
 
     res.json({
       success: true,
       results,
       stats: {
-        total: allResults.length,
-        average: Math.round(avgScore * 10) / 10,
-        highest,
-        lowest,
+        total: stats._count,
+        average: Math.round((stats._avg.percentage || 0) * 10) / 10,
+        highest: stats._max.percentage || 0,
+        lowest: stats._min.percentage || 0,
         passRate: Math.round(passRate * 10) / 10,
       },
       pagination: {
@@ -535,7 +548,7 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'),
         r.submittedAt ? r.submittedAt.toISOString().replace('T', ' ').substring(0, 19) : '',
       ]);
 
-      const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+      const csv = [headers.join(','), ...rows.map(row => row.map(v => { const s = String(v ?? ''); return `"${s.replace(/"/g, '""')}"`; }).join(','))].join('\n');
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
       return res.send(csv);
