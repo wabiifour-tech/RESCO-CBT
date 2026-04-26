@@ -823,7 +823,7 @@ router.post('/teachers/create', async (req, res) => {
 
     const teacher = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { email: generatedEmail, password: password, role: 'TEACHER', firstName: firstName.trim(), lastName: lastName.trim() },
+        data: { email: generatedEmail, password: await bcrypt.hash(password, 10), role: 'TEACHER', firstName: firstName.trim(), lastName: lastName.trim() },
       });
       const createdTeacher = await tx.teacher.create({
         data: {
@@ -928,7 +928,7 @@ router.post('/students/create', async (req, res) => {
     }
     const student = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { email: trimmedEmail, password: password, role: 'STUDENT' },
+        data: { email: trimmedEmail, password: await bcrypt.hash(password, 10), role: 'STUDENT' },
       });
       return tx.student.create({
         data: {
@@ -1027,7 +1027,7 @@ router.post('/students/bulk', async (req, res) => {
     if (toCreate.length > 0) {
       await prisma.$transaction(async (tx) => {
         for (const s of toCreate) {
-          const user = await tx.user.create({ data: { email: s.email, password: s.password, role: 'STUDENT' } });
+          const user = await tx.user.create({ data: { email: s.email, password: await bcrypt.hash(s.password, 10), role: 'STUDENT' } });
           await tx.student.create({ data: { id: user.id, admissionNo: s.admissionNo, firstName: s.firstName, lastName: s.lastName, className: s.className } });
           createdCount++;
         }
@@ -1160,7 +1160,7 @@ router.put('/users/:id/password', async (req, res) => {
     }
     await prisma.user.update({
       where: { id },
-      data: { password: newPassword },  // Store as plaintext
+      data: { password: await bcrypt.hash(newPassword, 10) },  // Store as bcrypt hash
     });
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {

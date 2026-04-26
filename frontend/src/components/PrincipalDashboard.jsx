@@ -296,8 +296,9 @@ export default function PrincipalDashboard() {
   useEffect(() => {
     if (activeTab === 'results') {
       api.get('/principal/results/filter-options').then(({ data }) => {
-        setResClasses(data.classes || []);
-        setResSubjects(data.subjects || []);
+        const filterData = data?.data || data;
+        setResClasses(filterData?.classes || []);
+        setResSubjects(filterData?.subjects || []);
       }).catch(() => {});
     }
   }, [activeTab]);
@@ -305,7 +306,7 @@ export default function PrincipalDashboard() {
   useEffect(() => {
     if (!resClass && !resSubject) { setResExams([]); return; }
     api.get(`/principal/exams?status=PUBLISHED&class=${encodeURIComponent(resClass)}&subject=${encodeURIComponent(resSubject)}&limit=200`).then(({ data }) => {
-      setResExams(data.exams || []);
+      setResExams(data?.exams || data?.data?.exams || []);
     }).catch(() => { setResExams([]); });
   }, [resClass, resSubject]);
 
@@ -313,7 +314,7 @@ export default function PrincipalDashboard() {
     if (activeTab !== 'results' || !resExamId) { setResPreview(null); return; }
     setResLoading(true);
     api.get(`/principal/results/${resExamId}`).then(({ data }) => {
-      setResPreview(data);
+      setResPreview(data?.data || data);
     }).catch(() => { setResPreview(null); }).finally(() => { setResLoading(false); });
   }, [activeTab, resExamId]);
 
@@ -331,7 +332,7 @@ export default function PrincipalDashboard() {
       setShowPwModal(false);
       setPwForm({ current: '', newPw: '', confirm: '' });
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to change password');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to change password');
     }
   };
 
@@ -356,7 +357,7 @@ export default function PrincipalDashboard() {
       setExamForm({ ...emptyNewExam });
       fetchExams();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create exam');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to create exam');
     } finally { setExamSaving(false); }
   };
 
@@ -381,7 +382,7 @@ export default function PrincipalDashboard() {
       setExamForm({ ...emptyNewExam });
       fetchExams();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update exam');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to update exam');
     } finally { setExamSaving(false); }
   };
 
@@ -392,7 +393,7 @@ export default function PrincipalDashboard() {
       toast.success('Exam deleted successfully!');
       fetchExams();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete exam');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to delete exam');
     }
   };
 
@@ -403,7 +404,7 @@ export default function PrincipalDashboard() {
       toast.success(res.data.message || 'Exam published successfully!');
       fetchExams();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to publish exam');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to publish exam');
     }
   };
 
@@ -414,7 +415,7 @@ export default function PrincipalDashboard() {
       toast.success(res.data.message || 'Exam archived successfully!');
       fetchExams();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to archive exam');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to archive exam');
     }
   };
 
@@ -481,7 +482,7 @@ export default function PrincipalDashboard() {
       fetchQuestions(questionsExamId);
       fetchExams();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save question');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to save question');
     } finally { setQSaving(false); }
   };
 
@@ -493,7 +494,7 @@ export default function PrincipalDashboard() {
       fetchQuestions(questionsExamId);
       fetchExams();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete question');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to delete question');
     }
   };
 
@@ -513,7 +514,7 @@ export default function PrincipalDashboard() {
       fetchQuestions(questionsExamId);
       fetchExams();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to upload questions');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to upload questions');
     } finally { setUploading(false); }
   };
 
@@ -536,7 +537,7 @@ export default function PrincipalDashboard() {
       toast.success(`${format.toUpperCase()} downloaded successfully!`);
     }).catch(err => {
       toast.dismiss();
-      toast.error(err.response?.data?.message || 'Failed to download results');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to download results');
     });
   };
 
@@ -558,7 +559,7 @@ export default function PrincipalDashboard() {
       setTeacherClassAssignments([{ className: 'JSS1', subject: '' }]);
       fetchTeachers();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create teacher');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to create teacher');
     }
   };
 
@@ -569,7 +570,7 @@ export default function PrincipalDashboard() {
       toast.success('Teacher deleted successfully!');
       fetchTeachers();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete teacher');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to delete teacher');
     }
   };
 
@@ -588,7 +589,7 @@ export default function PrincipalDashboard() {
       setStudentForm({ firstName: '', lastName: '', email: '', password: '', className: 'JSS1', admissionNo: '' });
       fetchStudents();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create student');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to create student');
     } finally { setStudentSaving(false); }
   };
 
@@ -599,7 +600,7 @@ export default function PrincipalDashboard() {
       toast.success('Student deleted successfully!');
       fetchStudents();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete student');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to delete student');
     }
   };
 
@@ -624,7 +625,7 @@ export default function PrincipalDashboard() {
       setShowLogoModal(false);
       window.location.reload();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to upload logo');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to upload logo');
     } finally { setLogoUploading(false); }
   };
 
@@ -651,7 +652,7 @@ export default function PrincipalDashboard() {
       setNewPassword('');
       fetchUsers();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update password');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to update password');
     }
   };
 

@@ -174,6 +174,9 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
     res.status(201).json(responseData);
   } catch (error) {
     console.error('Submit exam error:', error);
+    if (error.code === 'P2002') {
+      return res.status(409).json({ success: false, message: 'You have already submitted this exam.' });
+    }
     res.status(500).json({ success: false, message: 'Failed to submit exam.' });
   }
 });
@@ -290,7 +293,7 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
             submittedAt: result.submittedAt,
             examStartTime: result.examStartTime,
             examEndTime: result.examEndTime,
-            showScore: false,
+            showScores: false,
           },
         });
       }

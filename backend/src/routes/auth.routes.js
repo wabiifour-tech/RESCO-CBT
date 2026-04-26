@@ -218,10 +218,11 @@ router.post('/change-password', authenticate, async (req, res) => {
       });
     }
 
-    // Store new password as plaintext
+    // Store new password hashed with bcrypt
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({
       where: { id: userId },
-      data: { password: newPassword },
+      data: { password: hashedPassword },
     });
 
     return res.status(200).json({

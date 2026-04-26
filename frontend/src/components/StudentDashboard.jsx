@@ -172,7 +172,8 @@ export default function StudentDashboard() {
     try {
       setLoading(true);
       const res = await api.get('/exams/available');
-      setExams(res.data.exams || []);
+      const examsData = res.data?.data || res.data;
+      setExams(examsData?.exams || []);
     } catch (err) {
       toast.error('Failed to fetch exams');
     } finally {
@@ -183,7 +184,8 @@ export default function StudentDashboard() {
   const fetchResults = useCallback(async function () {
     try {
       const res = await api.get('/results/student');
-      setResults(res.data.results || []);
+      const resultsData = res.data?.data || res.data;
+      setResults(resultsData?.results || []);
     } catch (err) {
       toast.error('Failed to fetch results');
     }
@@ -292,7 +294,7 @@ export default function StudentDashboard() {
     }
   };
 
-  const doSubmitExam = async function () {
+  const doSubmitExam = useCallback(async function () {
     if (submitting) return;
     setShowSubmitModal(false);
     setSubmitting(true);
@@ -311,7 +313,7 @@ export default function StudentDashboard() {
         timeSpent: elapsed,
         examStartTime: startTimeRef.current ? new Date(startTimeRef.current).toISOString() : null,
       });
-      setExamResult(res.data.result);
+      setExamResult(res.data?.data?.result || res.data?.result);
       toast.success(res.data.result.passed === true ? 'Congratulations! You passed!' : 'Exam submitted. Keep practicing!');
       fetchResults();
       fetchExams();
@@ -320,6 +322,8 @@ export default function StudentDashboard() {
     } finally {
       setSubmitting(false);
     }
+  }, []);
+    doSubmitExam();
   };
 
   const confirmSubmit = function () {
@@ -451,8 +455,10 @@ export default function StudentDashboard() {
       );
     }
 
-    const passed = examResult.passed !== undefined ? examResult.passed
-      : (examResult.percentage || 0) >= (examDetail && examDetail.passMark ? examDetail.passMark : 50);
+    const passMark = Number(examDetail?.passMark) || 50;
+    const passed = examResult.passed !== undefined
+      ? examResult.passed
+      : (examResult.percentage || 0) >= passMark;
     const scorePercent = examResult.percentage || 0;
     const circumference = 2 * Math.PI * 80;
     const strokeDashoffset = circumference - (scorePercent / 100) * circumference;

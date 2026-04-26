@@ -11,12 +11,30 @@ const router = express.Router();
 // ========================================
 
 // Create Exam (TEACHER or PRINCIPAL)
-router.post('/', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+router.post('/', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility, shuffleQuestions, shuffleOptions, subject, className } = req.body;
 
     if (!title || !type || !duration || !totalMarks || !passMark || !subject || !className) {
       return res.status(400).json({ success: false, message: 'Missing required fields.' });
+    }
+
+    // Validate passMark range
+    if (passMark !== undefined && passMark !== null) {
+      const pm = parseInt(passMark, 10);
+      if (isNaN(pm) || pm < 0 || pm > 100) {
+        return res.status(400).json({ success: false, message: 'passMark must be between 0 and 100' });
+      }
+    }
+
+    // Validate startDate/endDate
+    if (startDate) {
+      const sd = new Date(startDate);
+      if (isNaN(sd.getTime())) return res.status(400).json({ success: false, message: 'Invalid startDate format' });
+    }
+    if (endDate) {
+      const ed = new Date(endDate);
+      if (isNaN(ed.getTime())) return res.status(400).json({ success: false, message: 'Invalid endDate format' });
     }
 
     const VALID_VISIBILITY = ['IMMEDIATE', 'MANUAL', 'AFTER_CLOSE'];
@@ -58,7 +76,7 @@ router.post('/', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, 
 });
 
 // Get Teacher's Exams
-router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) => {
+router.get('/teacher', authenticate, requireRole('TEACHER'), requireTeacherActive, async (req, res) => {
   try {
     const { status } = req.query;
 
@@ -129,7 +147,7 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), async (req, res) =>
 });
 
 // Update Exam (only DRAFT) — TEACHER, PRINCIPAL, ADMIN
-router.put('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+router.put('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -216,7 +234,7 @@ router.patch('/:id/publish', authenticate, requireRole('TEACHER', 'PRINCIPAL'), 
 });
 
 // Delete Exam (DRAFT only) — TEACHER, PRINCIPAL
-router.delete('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+router.delete('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { id } = req.params;
 

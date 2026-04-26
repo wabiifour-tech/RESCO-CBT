@@ -222,7 +222,7 @@ const server = app.listen(PORT, async () => {
     if (process.env.DATABASE_URL) {
       try {
         console.log('[DB Setup] Running prisma db push to ensure tables exist...');
-        const pushOutput = execSync('npx prisma db push --accept-data-loss 2>&1', {
+        const pushOutput = execSync('npx prisma db push --skip-generate 2>&1', {
           cwd: process.cwd(),
           timeout: 60000,
           encoding: 'utf-8',
@@ -253,6 +253,7 @@ const server = app.listen(PORT, async () => {
       const bcrypt = require('bcryptjs');
       const principalEmail = process.env.PRINCIPAL_EMAIL || 'principal@resco';
       const principalPass = process.env.PRINCIPAL_PASSWORD || 'affordables';
+      const hashedPrincipalPass = await bcrypt.hash(principalPass, 10);
       let existingPrincipal = await prisma.user.findUnique({ where: { email: principalEmail } });
 
       // Migrate old principal account if email changed
@@ -263,7 +264,7 @@ const server = app.listen(PORT, async () => {
           if (oldPrincipal) {
             await prisma.user.update({
               where: { email: oldEmail },
-              data: { email: principalEmail, password: principalPass },
+              data: { email: principalEmail, password: hashedPrincipalPass },
             });
             existingPrincipal = await prisma.user.findUnique({ where: { email: principalEmail } });
             console.log('✅ Principal account migrated: ' + oldEmail + ' → ' + principalEmail);
@@ -296,7 +297,7 @@ const server = app.listen(PORT, async () => {
         const newPrincipal = await prisma.user.create({
           data: {
             email: principalEmail,
-            password: principalPass,
+            password: hashedPrincipalPass,
             role: 'PRINCIPAL',
             firstName: 'Aderonke Rachael',
             lastName: 'Odewabi',
@@ -311,12 +312,21 @@ const server = app.listen(PORT, async () => {
         if (existingPrincipal.password.startsWith('$2')) {
           isMatch = await bcrypt.compare(principalPass, existingPrincipal.password);
         } else {
+          // Legacy plaintext — migrate to bcrypt
           isMatch = principalPass === existingPrincipal.password;
+        }
+        if (isMatch && !existingPrincipal.password.startsWith('$2')) {
+          // Migrate plaintext to bcrypt
+          await prisma.user.update({
+            where: { email: principalEmail },
+            data: { password: hashedPrincipalPass },
+          });
+          console.log('✅ Principal password migrated to bcrypt for: ' + principalEmail);
         }
         if (!isMatch) {
           await prisma.user.update({
             where: { email: principalEmail },
-            data: { password: principalPass },
+            data: { password: hashedPrincipalPass },
           });
           console.log('✅ Principal password updated for: ' + principalEmail);
         }

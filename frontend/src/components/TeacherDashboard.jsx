@@ -81,7 +81,8 @@ export default function TeacherDashboard() {
   const fetchData = useCallback(async () => {
     try {
       const examsRes = await api.get('/exams/teacher');
-      const examList = examsRes.data.exams || [];
+      const examsData = examsRes.data?.data || examsRes.data;
+      const examList = examsData?.exams || [];
       setExams(examList);
       setStats({
         total: examList.length,
@@ -98,7 +99,7 @@ export default function TeacherDashboard() {
   const fetchResults = useCallback(async () => {
     try {
       const { data } = await api.get('/results/teacher');
-      setResults(data.results || []);
+      setResults(data?.results || data?.data?.results || []);
     } catch {
       toast.error('Failed to load results');
     }
@@ -137,7 +138,7 @@ export default function TeacherDashboard() {
     if (!dlExamId) { setDlPreview(null); return; }
     try {
       const { data } = await api.get(`/results/teacher/${dlExamId}/details`);
-      setDlPreview(data);
+      setDlPreview(data?.data || data);
     } catch { toast.error('Failed to load preview'); }
   }, [dlExamId]);
   useEffect(() => { fetchDlPreview(); }, [fetchDlPreview]);

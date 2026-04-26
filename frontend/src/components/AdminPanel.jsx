@@ -103,7 +103,7 @@ export default function AdminPanel() {
   const [examQuestions, setExamQuestions] = useState([]);
   const [selectedExamInfo, setSelectedExamInfo] = useState(null);
   const [showExamModal, setShowExamModal] = useState(false);
-  const [examForm, setExamForm] = useState({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE', teacherId: '' });
+  const [examForm, setExamForm] = useState({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '', resultVisibility: 'MANUAL', teacherId: '' });
 
   // Search
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -235,8 +235,9 @@ export default function AdminPanel() {
     setLoading(true);
     try {
       const res = await api.get('/admin/questions/' + examId);
-      setSelectedExamInfo(res.data.exam || null);
-      setExamQuestions(res.data.questions || []);
+      const qPayload = res.data?.data || res.data;
+      setSelectedExamInfo(qPayload?.exam || null);
+      setExamQuestions(qPayload?.questions || []);
     } catch (err) {
       toast.error('Failed to load questions');
     } finally {
@@ -278,8 +279,9 @@ export default function AdminPanel() {
   useEffect(() => {
     if (activeTab === 'results') {
       api.get('/admin/results/filter-options').then(({ data }) => {
-        setResClasses(data.classes || []);
-        setResSubjects(data.subjects || []);
+        const filterData = data?.data || data;
+        setResClasses(filterData?.classes || []);
+        setResSubjects(filterData?.subjects || []);
       }).catch(() => {});
     }
   }, [activeTab]);
@@ -288,7 +290,7 @@ export default function AdminPanel() {
   useEffect(() => {
     if (!resClass && !resSubject) { setResExams([]); return; }
     api.get(`/admin/exams?status=PUBLISHED&class=${encodeURIComponent(resClass)}&subject=${encodeURIComponent(resSubject)}&limit=200`).then(({ data }) => {
-      setResExams(data.exams || []);
+      setResExams(data?.exams || data?.data?.exams || []);
     }).catch(() => { setResExams([]); });
   }, [resClass, resSubject]);
 
@@ -296,7 +298,7 @@ export default function AdminPanel() {
   useEffect(() => {
     if (activeTab !== 'results' || !resExamId) { setResPreview(null); return; }
     api.get(`/admin/results/${resExamId}`).then(({ data }) => {
-      setResPreview(data);
+      setResPreview(data?.data || data);
     }).catch(() => { setResPreview(null); });
   }, [activeTab, resExamId]);
 
@@ -440,7 +442,7 @@ export default function AdminPanel() {
       const res = await api.post('/admin/exams/create', examForm);
       toast.success(res.data.message);
       setShowExamModal(false);
-      setExamForm({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '', resultVisibility: 'IMMEDIATE', teacherId: '' });
+      setExamForm({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '', resultVisibility: 'MANUAL', teacherId: '' });
       fetchAllExams();
       fetchDraftExams();
     } catch (err) {
@@ -458,7 +460,7 @@ export default function AdminPanel() {
       fetchAllExams();
       fetchDraftExams();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to publish exam');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to publish exam');
     }
   };
 
@@ -469,7 +471,7 @@ export default function AdminPanel() {
       toast.success('Exam archived.');
       fetchAllExams();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to archive exam');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to archive exam');
     }
   };
 
@@ -481,7 +483,7 @@ export default function AdminPanel() {
       fetchAllExams();
       fetchDraftExams();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete exam');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to delete exam');
     }
   };
 
@@ -561,7 +563,7 @@ export default function AdminPanel() {
       fetchExamQuestions(selectedExamId);
       fetchDraftExams();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to add questions');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to add questions');
     } finally {
       setUploading(false);
     }
@@ -575,7 +577,7 @@ export default function AdminPanel() {
       fetchExamQuestions(selectedExamId);
       fetchDraftExams();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete question');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to delete question');
     }
   };
 
@@ -601,7 +603,7 @@ export default function AdminPanel() {
       setNewPassword('');
       fetchUsers();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update password');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to update password');
     }
   };
 
@@ -617,7 +619,7 @@ export default function AdminPanel() {
       setShowPasswordModal(false);
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to change password');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to change password');
     } finally {
       setPwChanging(false);
     }
@@ -1348,21 +1350,6 @@ export default function AdminPanel() {
             onFocus={(e) => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.background = '#fff'; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
           />
-        </div>
-        <div>
-          <label style={labelStyle}>Status</label>
-          <select value={teacherForm.status || 'PENDING'} onChange={(e) => setTeacherForm({ ...teacherForm, status: e.target.value })}
-            style={{
-              ...inputStyle,
-              cursor: 'pointer',
-              appearance: 'none',
-              background: '#f8fafc url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%2364748b\' d=\'M6 8L1 3h10z\'/%3E%3C/svg%3E") no-repeat right 16px center',
-            }}
-          >
-            <option value="PENDING">Pending</option>
-            <option value="ACTIVE">Active</option>
-            <option value="REJECTED">Rejected</option>
-          </select>
         </div>
         {/* Class & Subject Assignments */}
         <div style={{ marginTop: 16 }}>

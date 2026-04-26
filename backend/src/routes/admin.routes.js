@@ -257,7 +257,7 @@ router.post('/teachers/create', async (req, res) => {
       const user = await tx.user.create({
         data: {
           email: generatedEmail,
-          password: password,
+          password: await bcrypt.hash(password, 10),
           role: 'TEACHER',
           firstName: trimmedFirstName,
           lastName: trimmedLastName,
@@ -557,7 +557,7 @@ router.post('/students/create', async (req, res) => {
       const user = await tx.user.create({
         data: {
           email: trimmedEmail,
-          password: password,
+          password: await bcrypt.hash(password, 10),
           role: 'STUDENT',
         },
       });
@@ -770,7 +770,7 @@ router.post('/students/bulk', async (req, res) => {
           const user = await tx.user.create({
             data: {
               email: s.email,
-              password: s.password,
+              password: await bcrypt.hash(s.password, 10),
               role: 'STUDENT',
             },
           });
@@ -1170,6 +1170,24 @@ router.post('/exams/create', async (req, res) => {
 
     const dur = parseInt(duration, 10);
     if (isNaN(dur) || dur < 1) return res.status(400).json({ error: 'Duration must be a positive integer (minutes).' });
+
+    // Validate startDate/endDate
+    if (startDate) {
+      const sd = new Date(startDate);
+      if (isNaN(sd.getTime())) return res.status(400).json({ error: 'Invalid startDate format' });
+    }
+    if (endDate) {
+      const ed = new Date(endDate);
+      if (isNaN(ed.getTime())) return res.status(400).json({ error: 'Invalid endDate format' });
+    }
+
+    // Validate passMark range
+    if (passMark !== undefined && passMark !== null) {
+      const pm = parseInt(passMark, 10);
+      if (isNaN(pm) || pm < 0 || pm > 100) {
+        return res.status(400).json({ error: 'passMark must be between 0 and 100' });
+      }
+    }
 
     // Determine the teacherId
     let targetTeacherId = teacherId;
@@ -2069,7 +2087,7 @@ router.put('/users/:id/password', async (req, res) => {
     }
     await prisma.user.update({
       where: { id },
-      data: { password: newPassword },  // Store as plaintext
+      data: { password: await bcrypt.hash(newPassword, 10) },  // Store as bcrypt hash
     });
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {
