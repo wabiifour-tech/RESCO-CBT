@@ -867,36 +867,29 @@ router.delete('/students/:id', async (req, res) => {
 // ============================================================
 router.get('/analytics', async (req, res) => {
   try {
-    // 1. Performance by class — average scores per class
-    // groupBy does NOT support include in Prisma, so we use findMany instead
-    const allResults = await prisma.result.findMany({
-      include: {
-        student: { select: { className: true } },
-        exam: { select: { subject: true, className: true, passMark: true } },
-      },
+    // 1. Performance by class — use aggregation instead of loading all results
+    const classAgg = await prisma.result.groupBy({
+      by: ['studentId'],
+      _avg: { percentage: true },
     });
 
-    // Aggregate by class
-    const classScores = {};
-    const studentAvgMap = {};
-    for (const r of allResults) {
-      const cls = r.student?.className || 'Unknown';
-      const key = r.studentId;
-      if (!studentAvgMap[key]) {
-        studentAvgMap[key] = { cls: cls, percentages: [] };
-      }
-      studentAvgMap[key].percentages.push(r.percentage);
-    }
+    // Get student class info in batch
+    const studentIds = classAgg.map(r => r.studentId);
+    const studentRecords = await prisma.student.findMany({
+      where: { id: { in: studentIds } },
+      select: { id: true, className: true },
+    });
+    const studentClassMap = {};
+    studentRecords.forEach(s => { studentClassMap[s.id] = s.className; });
 
-    for (const key of Object.keys(studentAvgMap)) {
-      const data = studentAvgMap[key];
-      if (data.percentages.length === 0) continue;
-      const avg = data.percentages.reduce((a, b) => a + b, 0) / data.percentages.length;
-      if (!classScores[data.cls]) {
-        classScores[data.cls] = { total: 0, count: 0 };
+    const classScores = {};
+    for (const r of classAgg) {
+      const cls = studentClassMap[r.studentId] || 'Unknown';
+      if (!classScores[cls]) {
+        classScores[cls] = { total: 0, count: 0 };
       }
-      classScores[data.cls].total += avg;
-      classScores[data.cls].count += 1;
+      classScores[cls].total += r._avg.percentage || 0;
+      classScores[cls].count += 1;
     }
 
     const performanceByClass = Object.entries(classScores).map(([className, data]) => ({
@@ -905,16 +898,29 @@ router.get('/analytics', async (req, res) => {
       studentCount: data.count,
     }));
 
-    // 2. Performance by subject — reuse allResults
+    // 2. Performance by subject — use per-exam aggregation
+    const examScoreAgg = await prisma.result.groupBy({
+      by: ['examId'],
+      _avg: { percentage: true },
+      _count: true,
+    });
+    const examIds = examScoreAgg.map(r => r.examId);
+    const examRecords = await prisma.exam.findMany({
+      where: { id: { in: examIds } },
+      select: { id: true, subject: true, passMark: true },
+    });
+    const examMap = {};
+    examRecords.forEach(e => { examMap[e.id] = e; });
+
     const subjectScores = {};
-    for (const r of allResults) {
-      if (!r.exam) continue; // Skip orphaned results
-      const subj = r.exam?.subject || 'Unknown';
+    for (const r of examScoreAgg) {
+      const exam = examMap[r.examId];
+      const subj = exam?.subject || 'Unknown';
       if (!subjectScores[subj]) {
         subjectScores[subj] = { total: 0, count: 0 };
       }
-      subjectScores[subj].total += r.percentage;
-      subjectScores[subj].count += 1;
+      subjectScores[subj].total += r._avg.percentage || 0;
+      subjectScores[subj].count += r._count;
     }
 
     const performanceBySubject = Object.entries(subjectScores).map(([subject, data]) => ({
@@ -963,29 +969,24 @@ router.get('/analytics', async (req, res) => {
     });
 
     // 4. Top performing students
-    // NOTE: prisma groupBy does not support `include` or `select` — use only
-    // aggregation fields (_avg, _count, etc.) and fetch related data separately.
-    const topStudents = await prisma.result.groupBy({
+    const studentResultCounts = await prisma.result.groupBy({
       by: ['studentId'],
+      _count: { id: true },
       _avg: { percentage: true },
-      _count: { _all: true },
-      orderBy: {
-        _avg: { percentage: 'desc' },
-      },
+      orderBy: { _avg: { percentage: 'desc' } },
       take: 20,
     });
-
-    const studentIds = topStudents.map(ts => ts.studentId);
-    const studentsMap = {};
-    const studentRecords = await prisma.student.findMany({
-      where: { id: { in: studentIds } },
+    const topStudentIds = studentResultCounts.map(ts => ts.studentId);
+    const topStudentRecords = await prisma.student.findMany({
+      where: { id: { in: topStudentIds } },
       include: { user: { select: { email: true } } },
     });
-    studentRecords.forEach(s => { studentsMap[s.id] = s; });
+    const topStudentMap = {};
+    topStudentRecords.forEach(s => { topStudentMap[s.id] = s; });
 
-    const topStudentsData = topStudents
+    const topStudents = studentResultCounts
       .map(ts => {
-        const student = studentsMap[ts.studentId];
+        const student = topStudentMap[ts.studentId];
         if (!student) return null;
         return {
           studentId: ts.studentId,
@@ -995,7 +996,7 @@ router.get('/analytics', async (req, res) => {
           className: student.className,
           email: student.user?.email,
           averageScore: Math.round((ts._avg.percentage || 0) * 100) / 100,
-          examsTaken: ts._count._all,
+          examsTaken: ts._count.id,
         };
       })
       .filter(Boolean);
@@ -1039,15 +1040,28 @@ router.get('/analytics', async (req, res) => {
       endDate: exam.endDate,
     }));
 
-    // 6. Pass/Fail overview
-    const passedCount = allResults.filter(r => r.percentage >= (r.exam?.passMark || 50)).length;
-    const passFail = { passed: passedCount, failed: allResults.length - passedCount, total: allResults.length };
+    // 6. Pass/Fail overview — load only needed fields for accuracy
+    const resultPassFail = await prisma.result.findMany({
+      select: { examId: true, percentage: true },
+    });
+    let passed = 0;
+    let failed = 0;
+    for (const r of resultPassFail) {
+      const exam = examMap[r.examId];
+      const passMark = exam?.passMark || 50;
+      if (r.percentage >= passMark) {
+        passed++;
+      } else {
+        failed++;
+      }
+    }
+    const passFail = { passed, failed, total: resultPassFail.length };
 
     res.json({
       performanceByClass,
       performanceBySubject,
       examCompletionRates,
-      topStudents: topStudentsData,
+      topStudents,
       recentlyActiveExams: recentExams,
       passFail,
     });

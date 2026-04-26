@@ -50,7 +50,8 @@ const requireTeacherActive = async (req, res, next) => {
       });
     }
 
-    if (req.user.role !== 'TEACHER') {
+    // PRINCIPAL role has the same capabilities as teachers — allow pass-through
+    if (req.user.role !== 'TEACHER' && req.user.role !== 'PRINCIPAL') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. This endpoint is restricted to teachers.',

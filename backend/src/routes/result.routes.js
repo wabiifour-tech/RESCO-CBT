@@ -384,7 +384,10 @@ router.get('/teacher', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async 
       _count: true,
     });
 
-    const passRate = stats._count > 0 ? (await prisma.result.count({ where: { ...where, percentage: { gte: 50 } } }) / stats._count) * 100 : 0;
+    // Compute pass rate using each exam's actual passMark (not hardcoded 50)
+    const passRate = results.length > 0
+      ? Math.round(results.filter(r => r.percentage >= (r.exam?.passMark || 50)).length / results.length * 100 * 10) / 10
+      : 0;
 
     res.json({
       success: true,

@@ -323,8 +323,6 @@ export default function StudentDashboard() {
       setSubmitting(false);
     }
   }, []);
-    doSubmitExam();
-  };
 
   const confirmSubmit = function () {
     doSubmitExam();

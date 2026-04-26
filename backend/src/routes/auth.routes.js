@@ -210,7 +210,13 @@ router.post('/change-password', authenticate, async (req, res) => {
       });
     }
 
-    const isSamePassword = newPassword === user.password;
+    // Check new password differs from current password (handle both bcrypt and plaintext)
+    let isSamePassword = false;
+    if (user.password.startsWith('$2')) {
+      isSamePassword = await bcrypt.compare(newPassword, user.password);
+    } else {
+      isSamePassword = newPassword === user.password;
+    }
     if (isSamePassword) {
       return res.status(400).json({
         success: false,
