@@ -152,16 +152,16 @@ export default function TeacherDashboard() {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
+    if (!passwordForm.currentPassword || !passwordForm.currentPassword.trim()) {
+      toast.error('Current password is required.');
+      return;
+    }
     if (passwordForm.newPassword.length < 6) {
       toast.error('New password must be at least 6 characters');
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast.error('New passwords do not match');
-      return;
-    }
-    if (!passwordForm.currentPassword || !passwordForm.currentPassword.trim()) {
-      toast.error('Current password is required.');
       return;
     }
     try {
@@ -346,7 +346,18 @@ export default function TeacherDashboard() {
       URL.revokeObjectURL(url);
       toast.success('Export downloaded!');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Export failed');
+      const data = err.response?.data;
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text();
+          const json = JSON.parse(text);
+          toast.error(json.error || json.message || 'Export failed');
+        } catch {
+          toast.error('Export failed');
+        }
+      } else {
+        toast.error(data?.error || data?.message || 'Export failed');
+      }
     }
   };
 

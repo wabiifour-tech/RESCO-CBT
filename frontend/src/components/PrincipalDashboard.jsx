@@ -537,7 +537,19 @@ export default function PrincipalDashboard() {
       toast.success(`${format.toUpperCase()} downloaded successfully!`);
     }).catch(err => {
       toast.dismiss();
-      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to download results');
+      const data = err.response?.data;
+      if (data instanceof Blob) {
+        data.text().then(text => {
+          try {
+            const json = JSON.parse(text);
+            toast.error(json.error || json.message || 'Failed to download results');
+          } catch {
+            toast.error('Failed to download results');
+          }
+        }).catch(() => toast.error('Failed to download results'));
+      } else {
+        toast.error(data?.error || data?.message || 'Failed to download results');
+      }
     });
   };
 

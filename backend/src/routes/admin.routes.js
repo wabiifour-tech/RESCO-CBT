@@ -1231,6 +1231,10 @@ router.post('/exams/create', async (req, res) => {
     const dur = parseInt(duration, 10);
     if (isNaN(dur) || dur < 1) return res.status(400).json({ error: 'Duration must be a positive integer (minutes).' });
 
+    // Validate totalMarks
+    const tm = parseInt(totalMarks, 10);
+    if (!isNaN(tm) && tm < 1) return res.status(400).json({ error: 'totalMarks must be a positive integer.' });
+
     // Validate startDate/endDate
     if (startDate) {
       const sd = new Date(startDate);
@@ -1239,6 +1243,10 @@ router.post('/exams/create', async (req, res) => {
     if (endDate) {
       const ed = new Date(endDate);
       if (isNaN(ed.getTime())) return res.status(400).json({ error: 'Invalid endDate format' });
+    }
+    // Cross-field: endDate must be after startDate
+    if (startDate && endDate && new Date(endDate) <= new Date(startDate)) {
+      return res.status(400).json({ error: 'End date must be after start date.' });
     }
 
     // Validate passMark range
@@ -1270,11 +1278,11 @@ router.post('/exams/create', async (req, res) => {
         type: type || 'TEST',
         status: 'DRAFT',
         duration: dur,
-        totalMarks: !isNaN(parseInt(totalMarks, 10)) ? parseInt(totalMarks, 10) : 100,
+        totalMarks: tm > 0 ? tm : 100,
         passMark: !isNaN(parseInt(passMark, 10)) ? parseInt(passMark, 10) : 50,
         startDate: startDate || '',
         endDate: endDate || '',
-        resultVisibility: resultVisibility || 'MANUAL',
+        resultVisibility: ['IMMEDIATE', 'MANUAL', 'AFTER_CLOSE'].includes(resultVisibility) ? resultVisibility : 'MANUAL',
         className: className.trim(),
         subject: subject.trim(),
         teacherId: targetTeacherId,
@@ -1299,10 +1307,10 @@ router.post('/exams/create', async (req, res) => {
     });
   } catch (error) {
     console.error('[Admin Create Exam Error]', error);
-    const msg = error.code?.startsWith('P')
-      ? 'Database error: ' + (error.meta?.target || error.message)
-      : error.message || 'Failed to create exam.';
-    res.status(500).json({ error: msg });
+    if (error.code === 'P2002') {
+      return res.status(409).json({ error: 'Duplicate entry detected.' });
+    }
+    res.status(500).json({ error: 'Failed to create exam.' });
   }
 });
 
@@ -1541,7 +1549,7 @@ function parseTextQuestions(text) {
         questions.push({
           question: parts[0], optionA: parts[1], optionB: parts[2],
           optionC: parts[3], optionD: parts[4], answer: parts[5].toUpperCase(),
-          marks: parts.length >= 7 ? (parseInt(parts[6]) || 1) : 1, _rawIndex: i + 1,
+          marks: parts.length >= 7 ? (isNaN(parseInt(parts[6], 10)) || parseInt(parts[6], 10) < 0 ? 1 : parseInt(parts[6], 10)) : 1, _rawIndex: i + 1,
         });
       }
     }
@@ -1653,10 +1661,7 @@ router.post('/questions/upload', upload.single('file'), async (req, res) => {
     res.status(201).json({ success: true, data: { total: parsed.rows.length, created: created.length, errors } });
   } catch (error) {
     console.error('[Admin Upload Questions Error]', error);
-    const msg = error.code?.startsWith('P')
-      ? 'Database error: ' + (error.meta?.target || error.message)
-      : error.message || 'Failed to upload questions.';
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: 'Failed to upload questions.' });
   }
 });
 
@@ -1720,12 +1725,13 @@ router.delete('/questions/:questionId', async (req, res) => {
 // ============================================================
 router.post('/fix-shuffle', async (req, res) => {
   try {
+    // Only modify DRAFT exams — never touch PUBLISHED or ARCHIVED exams
     const shuffleResult = await prisma.exam.updateMany({
-      where: { shuffleOptions: 1 },
+      where: { shuffleOptions: 1, status: 'DRAFT' },
       data: { shuffleOptions: 0 },
     });
     const visibilityResult = await prisma.exam.updateMany({
-      where: { resultVisibility: 'IMMEDIATE' },
+      where: { resultVisibility: 'IMMEDIATE', status: 'DRAFT' },
       data: { resultVisibility: 'MANUAL' },
     });
     res.json({
@@ -1928,8 +1934,8 @@ router.get('/results/export/:examId', async (req, res) => {
     // --- Summary Stats Row ---
     const passed = results.filter(r => r.percentage >= passMark).length;
     const avgScore = results.length > 0 ? Math.round(results.reduce((s, r) => s + r.percentage, 0) / results.length * 10) / 10 : 0;
-    const highest = results.length > 0 ? Math.max(...results.map(r => r.percentage)) : 0;
-    const lowest = results.length > 0 ? Math.min(...results.map(r => r.percentage)) : 0;
+    const highest = results.length > 0 ? results.reduce((a, r) => Math.max(a, r.percentage || 0), -Infinity) : 0;
+    const lowest = results.length > 0 ? results.reduce((a, r) => Math.min(a, r.percentage || 0), Infinity) : 0;
     const summaryY = dlY + 16;
     doc.rect(45, summaryY, pw, 18).fill('#f0f0ff').stroke('#c7d2fe');
     doc.fontSize(8).fillColor('#3730a3').font('Helvetica-Bold');
@@ -2138,8 +2144,8 @@ router.put('/users/:id/password', async (req, res) => {
   try {
     const { id } = req.params;
     const { newPassword } = req.body;
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    if (!newPassword || newPassword.length < 6 || newPassword.length > 128) {
+      return res.status(400).json({ success: false, message: 'Password must be between 6 and 128 characters' });
     }
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) {

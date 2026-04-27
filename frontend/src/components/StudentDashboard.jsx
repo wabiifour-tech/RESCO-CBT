@@ -235,7 +235,7 @@ export default function StudentDashboard() {
       hasSubmittedRef.current = true;
       doSubmitExam();
     }
-  }, [view, timeLeft, examResult]);
+  }, [view, timeLeft, examResult, doSubmitExam]);
 
   // Cleanup timer on unmount
   useEffect(function () {

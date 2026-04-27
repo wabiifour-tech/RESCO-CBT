@@ -215,7 +215,7 @@ function parseTextQuestions(text) {
         questions.push({
           question: parts[0], optionA: parts[1], optionB: parts[2],
           optionC: parts[3], optionD: parts[4], answer: parts[5].toUpperCase(),
-          marks: parts.length >= 7 ? (parseInt(parts[6]) || 1) : 1, _rawIndex: i + 1,
+          marks: parts.length >= 7 ? (isNaN(parseInt(parts[6], 10)) || parseInt(parts[6], 10) < 0 ? 1 : parseInt(parts[6], 10)) : 1, _rawIndex: i + 1,
         });
       }
     }

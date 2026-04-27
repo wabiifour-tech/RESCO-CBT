@@ -603,8 +603,8 @@ router.get('/results/:examId', async (req, res) => {
     // Summary stats
     const scores = ranked.map((r) => r.percentage);
     const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-    const highest = scores.length > 0 ? Math.max(...scores) : 0;
-    const lowest = scores.length > 0 ? Math.min(...scores) : 0;
+    const highest = scores.length > 0 ? scores.reduce((a, b) => Math.max(a, b), -Infinity) : 0;
+    const lowest = scores.length > 0 ? scores.reduce((a, b) => Math.min(a, b), Infinity) : 0;
     const passCount = ranked.filter((r) => r.status === 'PASS').length;
 
     res.json({
@@ -695,7 +695,9 @@ router.get('/results/export/:examId', async (req, res) => {
         ];
       });
 
-      const csv = [headers.join(','), ...ranked.map(row => row.map(v => { const s = String(v ?? ''); return `"${s.replace(/"/g, '""')}"`; }).join(','))].join('\n');
+      // Sanitize cells to prevent CSV formula injection (=, +, -, @, \t, \r prefixes)
+      const sanitizeCSVCell = (val) => { const s = String(val ?? ''); return /^[=+\-@\t\r]/.test(s) ? "'" + s : s; };
+      const csv = [headers.join(','), ...ranked.map(row => row.map(v => { const s = sanitizeCSVCell(v); return `"${s.replace(/"/g, '""')}"`; }).join(','))].join('\n');
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
       return res.send(csv);
@@ -779,7 +781,7 @@ router.get('/results/export/:examId', async (req, res) => {
     const scores = ranked.map((r) => r.pct);
     const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
     const passCount = ranked.filter((r) => r.status === 'PASS').length;
-    doc.text(`Total Students: ${ranked.length}  |  Average: ${Math.round(avg * 100) / 100}%  |  Highest: ${Math.max(...scores)}%  |  Lowest: ${Math.min(...scores)}%`, 50, y);
+    doc.text(`Total Students: ${ranked.length}  |  Average: ${Math.round(avg * 100) / 100}%  |  Highest: ${highest}%  |  Lowest: ${lowest}%`, 50, y);
     y += 14;
     doc.text(`Passed: ${passCount}  |  Failed: ${ranked.length - passCount}  |  Pass Rate: ${Math.round((passCount / ranked.length) * 10000) / 100}%`, 50, y);
 
@@ -874,6 +876,12 @@ router.post('/teachers/create', async (req, res) => {
     });
   } catch (error) {
     console.error('[Principal Create Teacher Error]', error);
+    if (error.code === 'P2002') {
+      const target = error.meta?.target || [];
+      if (target.includes('username')) return res.status(409).json({ success: false, message: 'A teacher with this username already exists.' });
+      if (target.includes('email')) return res.status(409).json({ success: false, message: 'A user with this email already exists.' });
+      return res.status(409).json({ success: false, message: 'Duplicate record detected.' });
+    }
     res.status(500).json({ success: false, message: 'Failed to create teacher' });
   }
 });
