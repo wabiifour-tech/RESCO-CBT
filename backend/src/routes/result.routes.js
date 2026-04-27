@@ -598,7 +598,9 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'),
         r.submittedAt ? r.submittedAt.toISOString().replace('T', ' ').substring(0, 19) : '',
       ]);
 
-      const csv = [headers.join(','), ...rows.map(row => row.map(v => { const s = String(v ?? ''); return `"${s.replace(/"/g, '""')}"`; }).join(','))].join('\n');
+      // Sanitize cells to prevent CSV formula injection (=, +, -, @, \t, \r prefixes)
+      const sanitizeCSVCell = (val) => { const s = String(val ?? ''); return /^[=+\-@\t\r]/.test(s) ? "'" + s : s; };
+      const csv = [headers.join(','), ...rows.map(row => row.map(v => { const s = sanitizeCSVCell(v); return `"${s.replace(/"/g, '""')}"`; }).join(','))].join('\n');
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
       return res.send(csv);

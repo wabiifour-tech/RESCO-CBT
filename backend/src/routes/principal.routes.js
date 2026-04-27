@@ -779,9 +779,11 @@ router.get('/results/export/:examId', async (req, res) => {
     y += 18;
     doc.font('Helvetica').fontSize(9);
     const scores = ranked.map((r) => r.pct);
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
+    const lowestScore = scores.length > 0 ? Math.min(...scores) : 0;
     const passCount = ranked.filter((r) => r.status === 'PASS').length;
-    doc.text(`Total Students: ${ranked.length}  |  Average: ${Math.round(avg * 100) / 100}%  |  Highest: ${highest}%  |  Lowest: ${lowest}%`, 50, y);
+    doc.text(`Total Students: ${ranked.length}  |  Average: ${Math.round(avg * 100) / 100}%  |  Highest: ${Math.round(highestScore * 100) / 100}%  |  Lowest: ${Math.round(lowestScore * 100) / 100}%`, 50, y);
     y += 14;
     doc.text(`Passed: ${passCount}  |  Failed: ${ranked.length - passCount}  |  Pass Rate: ${Math.round((passCount / ranked.length) * 10000) / 100}%`, 50, y);
 

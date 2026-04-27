@@ -19,6 +19,17 @@ router.post('/', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeach
       return res.status(400).json({ success: false, message: 'Missing required fields.' });
     }
 
+    // Validate type
+    if (!['TEST', 'EXAM'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Invalid exam type. Must be TEST or EXAM.' });
+    }
+
+    // Validate totalMarks
+    const tmInput = parseInt(totalMarks, 10);
+    if (isNaN(tmInput) || tmInput < 1) {
+      return res.status(400).json({ success: false, message: 'totalMarks must be a positive integer.' });
+    }
+
     // Validate passMark range
     if (passMark !== undefined && passMark !== null) {
       const pm = parseInt(passMark, 10);
@@ -190,7 +201,7 @@ router.put('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTea
         ...(description !== undefined && { description }),
         ...(type && { type }),
         ...(duration !== undefined && duration !== null && !isNaN(parseInt(duration, 10)) && { duration: parseInt(duration, 10) }),
-        ...(totalMarks !== undefined && totalMarks !== null && !isNaN(parseInt(totalMarks, 10)) && { totalMarks: parseInt(totalMarks, 10) }),
+        ...(totalMarks !== undefined && totalMarks !== null && !isNaN(parseInt(totalMarks, 10)) && parseInt(totalMarks, 10) >= 1 && { totalMarks: parseInt(totalMarks, 10) }),
         ...(passMark !== undefined && passMark !== null && !isNaN(parseInt(passMark, 10)) && { passMark: parseInt(passMark, 10) }),
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
@@ -295,7 +306,7 @@ router.delete('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), require
 });
 
 // Archive Exam — TEACHER, PRINCIPAL, ADMIN
-router.patch('/:id/archive', authenticate, requireRole('TEACHER', 'ADMIN', 'PRINCIPAL'), async (req, res) => {
+router.patch('/:id/archive', authenticate, requireRole('TEACHER', 'ADMIN', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { id } = req.params;
 

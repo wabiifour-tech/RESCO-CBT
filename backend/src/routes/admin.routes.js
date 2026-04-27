@@ -2069,7 +2069,7 @@ router.get('/results/export/:examId', async (req, res) => {
 });
 
 // ============================================================
-// GET /users — List ALL users with passwords (for admin)
+// GET /users — List ALL users (without passwords) for admin
 // ============================================================
 router.get('/users', async (req, res) => {
   try {
@@ -2147,9 +2147,16 @@ router.put('/users/:id/password', async (req, res) => {
     if (!newPassword || newPassword.length < 6 || newPassword.length > 128) {
       return res.status(400).json({ success: false, message: 'Password must be between 6 and 128 characters' });
     }
+    // Prevent admin from resetting their own password (use /auth/change-password) or other admin/principal accounts
+    if (id === req.user.userId) {
+      return res.status(400).json({ success: false, message: 'Use the "Change Password" feature in your profile settings to change your own password.' });
+    }
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (user.role === 'ADMIN' || user.role === 'PRINCIPAL') {
+      return res.status(403).json({ success: false, message: 'Cannot reset this user\'s password.' });
     }
     await prisma.user.update({
       where: { id },
