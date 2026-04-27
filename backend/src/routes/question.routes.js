@@ -5,7 +5,7 @@ const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
-const { requireRole } = require('../middleware/roleMiddleware');
+const { requireRole, requireTeacherActive } = require('../middleware/roleMiddleware');
 
 // ============================================================
 // Multer configuration for file uploads (CSV, PDF, DOCX, TXT)
@@ -266,7 +266,7 @@ function parseTextQuestions(text) {
 // ============================================================
 // POST /manual - Add Questions Manually
 // ============================================================
-router.post('/manual', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+router.post('/manual', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { examId, questions } = req.body;
 
@@ -370,7 +370,7 @@ router.post('/manual', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async 
 // ============================================================
 // POST /upload - Upload Questions (CSV, PDF, DOCX, TXT)
 // ============================================================
-router.post('/upload', authenticate, requireRole('TEACHER', 'PRINCIPAL'), upload.single('file'), async (req, res) => {
+router.post('/upload', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, upload.single('file'), async (req, res) => {
   try {
     const { examId } = req.body;
 
@@ -504,7 +504,7 @@ router.post('/upload', authenticate, requireRole('TEACHER', 'PRINCIPAL'), upload
 // ============================================================
 // GET /:examId - Get Questions for Exam (Teacher View)
 // ============================================================
-router.get('/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+router.get('/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { examId } = req.params;
 
@@ -559,7 +559,7 @@ router.get('/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async 
 // ============================================================
 // PUT /:id - Update a Question
 // ============================================================
-router.put('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+router.put('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -683,7 +683,7 @@ router.put('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req
 // ============================================================
 // DELETE /:id - Delete a Question
 // ============================================================
-router.delete('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+router.delete('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { id } = req.params;
 

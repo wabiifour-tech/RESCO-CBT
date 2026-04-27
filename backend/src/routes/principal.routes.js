@@ -1004,6 +1004,15 @@ router.post('/students/bulk', async (req, res) => {
     for (let i = 0; i < students.length; i++) {
       const s = students[i];
       const row = i + 1;
+      // Type guard: ensure required fields are strings
+      if (typeof s !== 'object' || s === null) {
+        errors.push({ row, admissionNo: 'N/A', error: `Row ${row}: Invalid record format.` });
+        continue;
+      }
+      if (typeof s.email !== 'string' || typeof s.password !== 'string' || typeof s.firstName !== 'string' || typeof s.lastName !== 'string' || typeof s.className !== 'string' || typeof s.admissionNo !== 'string') {
+        errors.push({ row, admissionNo: String(s.admissionNo || 'N/A'), error: `Row ${row}: All fields must be strings.` });
+        continue;
+      }
       if (!s.email || !s.password || !s.firstName || !s.lastName || !s.className || !s.admissionNo) {
         errors.push({ row, admissionNo: s.admissionNo || 'N/A', error: 'Missing required fields' });
         continue;
@@ -1176,8 +1185,12 @@ router.put('/users/:id/password', async (req, res) => {
   try {
     const { id } = req.params;
     const { newPassword } = req.body;
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6 || newPassword.length > 128) {
+      return res.status(400).json({ success: false, message: 'Password must be between 6 and 128 characters' });
+    }
+    // Prevent principal from resetting their own password through this endpoint
+    if (id === req.user.userId) {
+      return res.status(400).json({ success: false, message: 'Use the "Change Password" feature in your profile settings to change your own password.' });
     }
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) {

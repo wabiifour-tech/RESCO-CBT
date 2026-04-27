@@ -929,9 +929,9 @@ export default function PrincipalDashboard() {
           </h3>
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
             {[
-              { label: 'Passed', value: analytics.passFail.passed, total: analytics.passFail.total, color: '#10b981', bg: '#ecfdf5', icon: ArrowUpCircle },
-              { label: 'Failed', value: analytics.passFail.failed, total: analytics.passFail.total, color: '#ef4444', bg: '#fef2f2', icon: ArrowDownCircle },
-              { label: 'Total Results', value: analytics.passFail.total, total: analytics.passFail.total, color: '#6366f1', bg: '#eef2ff', icon: BarChart3 },
+              { label: 'Passed', value: (analytics.passFail?.passed ?? 0), total: (analytics.passFail?.total ?? 0), color: '#10b981', bg: '#ecfdf5', icon: ArrowUpCircle },
+              { label: 'Failed', value: (analytics.passFail?.failed ?? 0), total: (analytics.passFail?.total ?? 0), color: '#ef4444', bg: '#fef2f2', icon: ArrowDownCircle },
+              { label: 'Total Results', value: (analytics.passFail?.total ?? 0), total: (analytics.passFail?.total ?? 0), color: '#6366f1', bg: '#eef2ff', icon: BarChart3 },
             ].map((item) => {
               const Icon = item.icon;
               const pct = item.total > 0 ? Math.round((item.value / item.total) * 100) : 0;
@@ -967,7 +967,7 @@ export default function PrincipalDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {analytics.performanceByClass.map((cls, idx) => (
+                {(analytics.performanceByClass || []).map((cls, idx) => (
                   <tr key={cls.className} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 14px', fontWeight: 600, color: '#1e293b' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -1003,7 +1003,7 @@ export default function PrincipalDashboard() {
             Performance by Subject
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
-            {analytics.performanceBySubject.map((subj) => (
+            {(analytics.performanceBySubject || []).map((subj) => (
               <div key={subj.subject} style={{ padding: 16, borderRadius: 12, border: '1px solid #f1f5f9', background: '#fafafa' }}>
                 <p style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: '0 0 8px' }}>{subj.subject}</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1039,7 +1039,7 @@ export default function PrincipalDashboard() {
                   <tr key={s.studentId} style={{ borderBottom: '1px solid #f1f5f9', background: idx < 3 ? '#fffbeb' : 'transparent' }}>
                     <td style={{ padding: '10px 14px' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, fontWeight: 800, fontSize: 13, background: idx === 0 ? '#fbbf24' : idx === 1 ? '#d1d5db' : idx === 2 ? '#f97316' : '#f1f5f9', color: idx < 3 ? '#fff' : '#64748b' }}>
-                        {s.averageScore}
+                        {idx + 1}
                       </span>
                     </td>
                     <td style={{ padding: '10px 14px', fontWeight: 600, color: '#1e293b' }}>{s.firstName || ''} {s.lastName || ''}</td>
@@ -1074,7 +1074,7 @@ export default function PrincipalDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {analytics.recentlyActiveExams.map((exam) => (
+                {(analytics.recentlyActiveExams || []).map((exam) => (
                   <tr key={exam.examId} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '10px 14px', fontWeight: 600, color: '#1e293b' }}>{exam.title}</td>
                     <td style={{ padding: '10px 14px', color: '#374151' }}>{exam.subject}</td>
@@ -1086,7 +1086,7 @@ export default function PrincipalDashboard() {
                     <td style={{ padding: '10px 14px', color: '#64748b' }}>{exam.questionCount}</td>
                   </tr>
                 ))}
-                {analytics.recentlyActiveExams.length === 0 && (
+                {(analytics.recentlyActiveExams || []).length === 0 && (
                   <tr><td colSpan={6} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>No recent exam activity</td></tr>
                 )}
               </tbody>
@@ -1736,7 +1736,9 @@ export default function PrincipalDashboard() {
                     <td style={{ padding: '10px 14px', fontWeight: 700, color: '#374151' }}>{r.score}/{r.totalMarks}</td>
                     <td style={{ padding: '10px 14px', fontWeight: 800, color: r.status === 'PASS' ? '#059669' : '#dc2626' }}>{r.percentage}%</td>
                     <td style={{ padding: '10px 14px' }}>
-                      {renderStatusBadge(r.status === 'PASS' ? 'ACTIVE' : 'REJECTED')}
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${r.status === 'PASS' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {r.status === 'PASS' ? 'PASSED' : 'FAILED'}
+                      </span>
                     </td>
                     <td style={{ padding: '10px 14px', fontSize: 13, color: '#64748b' }}>{r.timeSpent ? Math.floor(r.timeSpent / 60) + 'm ' + (r.timeSpent % 60) + 's' : '-'}</td>
                   </tr>

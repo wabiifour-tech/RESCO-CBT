@@ -1711,7 +1711,7 @@ router.delete('/questions/:questionId', async (req, res) => {
       include: { exam: true },
     });
     if (!question) return res.status(404).json({ error: 'Question not found.' });
-    if (question.exam.status !== 'DRAFT') return res.status(400).json({ error: 'Cannot delete questions from a published exam.' });
+    if (!question.exam || question.exam.status !== 'DRAFT') return res.status(400).json({ error: 'Cannot delete questions from a published exam.' });
     await prisma.examQuestion.delete({ where: { id: req.params.questionId } });
     res.json({ message: 'Question deleted.' });
   } catch (error) {

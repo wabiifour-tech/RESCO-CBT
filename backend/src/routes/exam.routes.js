@@ -7,6 +7,24 @@ const { shuffleArray } = require('../utils/helpers');
 const router = express.Router();
 
 // ========================================
+// In-memory store for exam session start times
+// Maps "examId_studentId" -> ISO timestamp of when questions were first fetched
+// This prevents students from manipulating examStartTime on submit
+// ========================================
+const examSessionStarts = new Map();
+
+// Cleanup old sessions every 10 minutes to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  const TEN_HOURS = 10 * 60 * 60 * 1000;
+  for (const [key, startTime] of examSessionStarts.entries()) {
+    if (now - new Date(startTime).getTime() > TEN_HOURS) {
+      examSessionStarts.delete(key);
+    }
+  }
+}, 10 * 60 * 1000);
+
+// ========================================
 // TEACHER ROUTES
 // ========================================
 
@@ -46,6 +64,14 @@ router.post('/', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeach
     if (endDate) {
       const ed = new Date(endDate);
       if (isNaN(ed.getTime())) return res.status(400).json({ success: false, message: 'Invalid endDate format' });
+    }
+    // Cross-validate: endDate must be after startDate
+    if (startDate && endDate) {
+      const sd = new Date(startDate);
+      const ed = new Date(endDate);
+      if (!isNaN(sd.getTime()) && !isNaN(ed.getTime()) && ed <= sd) {
+        return res.status(400).json({ success: false, message: 'End date must be after start date.' });
+      }
     }
 
     const VALID_VISIBILITY = ['IMMEDIATE', 'MANUAL', 'AFTER_CLOSE'];
@@ -106,13 +132,21 @@ router.get('/teacher', authenticate, requireRole('TEACHER'), requireTeacherActiv
     if (assignedClassNames.length > 0) {
       orConditions.push({
         teacherId: { not: req.user.userId },
-        className: { in: assignedClassNames },
+        AND: [
+          { className: { in: assignedClassNames } },
+          { subject: { in: assignedSubjects } },
+        ],
       });
     }
 
     const where = { OR: orConditions };
 
     if (status) {
+      // Validate status filter
+      const validStatuses = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ success: false, message: 'Invalid status filter. Must be one of: ' + validStatuses.join(', ') });
+      }
       // Apply status filter inside each OR condition
       where.OR = where.OR.map(condition => ({ ...condition, status }));
     }
@@ -202,7 +236,7 @@ router.put('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTea
         ...(type && { type }),
         ...(duration !== undefined && duration !== null && !isNaN(parseInt(duration, 10)) && { duration: parseInt(duration, 10) }),
         ...(totalMarks !== undefined && totalMarks !== null && !isNaN(parseInt(totalMarks, 10)) && parseInt(totalMarks, 10) >= 1 && { totalMarks: parseInt(totalMarks, 10) }),
-        ...(passMark !== undefined && passMark !== null && !isNaN(parseInt(passMark, 10)) && { passMark: parseInt(passMark, 10) }),
+        ...(passMark !== undefined && passMark !== null && !isNaN(parseInt(passMark, 10)) && parseInt(passMark, 10) >= 0 && parseInt(passMark, 10) <= 100 && { passMark: parseInt(passMark, 10) }),
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
         ...(resultVisibility && { resultVisibility }),
@@ -388,8 +422,14 @@ router.get('/available', authenticate, requireRole('STUDENT'), async (req, res) 
 
     const examList = exams.map(exam => {
       const hasTaken = exam.results.length > 0;
-      // All published exams are open — dates are informational only
-      const isOpen = true;
+      // Check if exam is actually open based on startDate
+      let isOpen = true;
+      if (exam.startDate) {
+        const sd = new Date(exam.startDate);
+        if (!isNaN(sd.getTime()) && sd > now) {
+          isOpen = false;
+        }
+      }
       const { results, ...examData } = exam;
       return { ...examData, hasTaken, isOpen };
     });
@@ -433,6 +473,14 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
 
     if (exam.status !== 'PUBLISHED') {
       return res.status(400).json({ success: false, message: 'This exam is not available.' });
+    }
+
+    // Enforce startDate — block access if exam hasn't started yet
+    if (exam.startDate) {
+      const sd = new Date(exam.startDate);
+      if (!isNaN(sd.getTime()) && sd > now) {
+        return res.status(400).json({ success: false, message: 'This exam has not started yet. Please wait until the scheduled start time.' });
+      }
     }
 
     // Verify the student belongs to the exam's class
@@ -507,7 +555,14 @@ router.get('/:id/questions', authenticate, requireRole('STUDENT'), async (req, r
       },
       questions: formattedQuestions,
       examStartTime: now.toISOString(),
+      serverStartTime: now.toISOString(),
     });
+
+    // Store server-side start time for this exam session
+    const sessionKey = `${id}_${req.user.userId}`;
+    if (!examSessionStarts.has(sessionKey)) {
+      examSessionStarts.set(sessionKey, now.toISOString());
+    }
   } catch (error) {
     console.error('Get exam questions error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch exam questions.' });
@@ -550,3 +605,8 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 module.exports = router;
+
+// Export getter for server-side exam start times (used by result.routes.js)
+module.exports.getServerStartTime = function(sessionKey) {
+  return examSessionStarts.get(sessionKey) || null;
+};

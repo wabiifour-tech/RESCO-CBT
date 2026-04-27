@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
  * Verifies the Bearer token from the Authorization header
  * and attaches the decoded user payload to req.user.
  */
-const authenticate = (req, res, next) => {
+const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -46,6 +46,22 @@ const authenticate = (req, res, next) => {
 
     const decoded = jwt.verify(token, secret);
 
+    // Verify user still exists in database (handles deleted/deactivated accounts)
+    const prisma = require('../config/database');
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, role: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User account no longer exists. Please log in again.',
+      });
+    }
+
+    // Refresh role from database in case it changed
+    decoded.role = user.role;
     req.user = decoded;
     next();
   } catch (error) {

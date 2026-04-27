@@ -57,8 +57,11 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
       return res.status(400).json({ success: false, message: 'You have already submitted this exam.' });
     }
 
-    // Enforce exam duration — reject submission if time exceeded (with 60s grace)
-    const startTimeRaw = examStartTime ? new Date(examStartTime) : null;
+    // Enforce exam duration — use server-side start time if available (prevents cheating)
+    const { getServerStartTime } = require('./exam.routes');
+    const sessionKey = `${examId}_${studentId}`;
+    const serverStart = getServerStartTime ? getServerStartTime(sessionKey) : null;
+    const startTimeRaw = serverStart ? new Date(serverStart) : (examStartTime ? new Date(examStartTime) : null);
     if (startTimeRaw && !isNaN(startTimeRaw.getTime()) && exam.duration > 0) {
       const maxAllowedMs = (exam.duration + 1) * 60 * 1000; // duration + 1 min grace
       const elapsedMs = now.getTime() - startTimeRaw.getTime();

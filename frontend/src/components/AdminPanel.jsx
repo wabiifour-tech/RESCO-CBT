@@ -377,6 +377,7 @@ export default function AdminPanel() {
   };
 
   const handleApproveTeacher = async (id) => {
+    if (!window.confirm('Approve this teacher? They will be able to create and manage exams.')) return;
     try {
       await api.patch('/admin/teachers/' + id + '/approve');
       toast.success('Teacher approved');
@@ -387,6 +388,7 @@ export default function AdminPanel() {
   };
 
   const handleRejectTeacher = async (id) => {
+    if (!window.confirm('Reject this teacher? They will not be able to access the system.')) return;
     try {
       await api.patch('/admin/teachers/' + id + '/reject');
       toast.success('Teacher rejected');
@@ -1498,16 +1500,20 @@ export default function AdminPanel() {
         </div>
         <div>
           <label style={labelStyle}>Class</label>
-          <input
-            type="text"
+          <select
             required
             value={studentForm.className}
             onChange={(e) => setStudentForm({ ...studentForm, className: e.target.value })}
-            style={inputStyle}
-            placeholder="e.g. SS1A, JSS2B"
-            onFocus={(e) => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.background = '#fff'; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
-          />
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          >
+            <option value="">Select Class</option>
+            <option value="JSS1">JSS 1</option>
+            <option value="JSS2">JSS 2</option>
+            <option value="JSS3">JSS 3</option>
+            <option value="SSS1">SSS 1</option>
+            <option value="SSS2">SSS 2</option>
+            <option value="SSS3">SSS 3</option>
+          </select>
         </div>
         <div>
           <label style={labelStyle}>Email</label>
@@ -1924,6 +1930,7 @@ export default function AdminPanel() {
                   <select value={examForm.resultVisibility} onChange={(e) => setExamForm({ ...examForm, resultVisibility: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid #e2e8f0', fontSize: 14, outline: 'none', background: '#f8fafc' }}>
                     <option value="IMMEDIATE">Show results immediately after submission</option>
                     <option value="AFTER_CLOSE">Show results only after exam closes</option>
+                    <option value="MANUAL">Manual (Teacher releases results)</option>
                   </select>
                 </div>
                 <button type="submit" style={{ width: '100%', padding: '13px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.35)', transition: 'all 0.2s ease' }}>Create Exam</button>

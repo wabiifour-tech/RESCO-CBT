@@ -26,6 +26,7 @@ api.interceptors.response.use(
       try {
         localStorage.removeItem('resco_token');
         localStorage.removeItem('resco_user');
+        try { const { useAuthStore } = require('../store/authStore'); useAuthStore.getState().logout(); } catch(e) {}
       } catch (e) { /* ignore */ }
       // Show session expired notification before redirecting
       if (typeof window !== 'undefined') {

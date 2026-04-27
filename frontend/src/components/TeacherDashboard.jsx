@@ -245,6 +245,7 @@ export default function TeacherDashboard() {
   };
 
   const handlePublishExam = async (id) => {
+    if (!window.confirm('Are you sure you want to publish this exam? Students will be able to take it.')) return;
     try {
       await api.patch(`/exams/${id}/publish`);
       toast.success('Exam published!');
@@ -283,9 +284,9 @@ export default function TeacherDashboard() {
     try {
       await api.post('/questions/manual', {
         examId: selectedExam?.id,
-        questions: questionForm.filter(q => q.question),
+        questions: questionForm.filter(q => q.question && q.question.trim()),
       });
-      toast.success(`${questionForm.filter(q => q.question).length} questions added!`);
+      toast.success(`${questionForm.filter(q => q.question && q.question.trim()).length} questions added!`);
       setShowAddQuestions(false);
       setSelectedExam(null);
       setQuestionForm(
