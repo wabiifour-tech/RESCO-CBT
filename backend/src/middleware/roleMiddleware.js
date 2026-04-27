@@ -58,6 +58,12 @@ const requireTeacherActive = async (req, res, next) => {
       });
     }
 
+    // PRINCIPAL bypasses teacher check — they have full access
+    if (req.user.role === 'PRINCIPAL') {
+      req.teacher = { status: 'ACTIVE', firstName: 'Principal', lastName: '' };
+      return next();
+    }
+
     const teacher = await prisma.teacher.findUnique({
       where: { id: req.user.userId },
       select: { status: true, firstName: true, lastName: true },

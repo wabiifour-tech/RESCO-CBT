@@ -38,9 +38,30 @@ function parseCSV(buffer) {
   if (missing.length > 0) return { error: `Missing headers: ${missing.join(', ')}. Required: ${expected.join(', ')}` };
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
+    let line = lines[i].trim();
     if (!line) continue;
-    const values = line.split(',').map((v) => v.trim());
+    // Handle quoted CSV fields (commas inside double-quoted strings)
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+    for (let c = 0; c < line.length; c++) {
+      const ch = line[c];
+      if (ch === '"') {
+        if (inQuotes && c + 1 < line.length && line[c + 1] === '"') {
+          current += '"'; // escaped quote
+          c++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    values.push(current.trim()); // last field
+    
     if (values.length < 7) { rows.push({ _rawIndex: i + 1, _parseError: `Row ${i + 1}: Expected 7 columns, found ${values.length}.` }); continue; }
     const obj = {};
     headers.forEach((h, idx) => { obj[h] = values[idx] || ''; });
@@ -247,6 +268,12 @@ router.post('/teachers/create', async (req, res) => {
 
     // Generate a unique email from username (required by User model)
     const generatedEmail = `${trimmedUsername}@resco.local`;
+
+    // Check if generated email already exists (e.g., from a student account)
+    const existingEmail = await prisma.user.findUnique({ where: { email: generatedEmail } });
+    if (existingEmail) {
+      return res.status(409).json({ error: 'A user with the generated email already exists. Please choose a different username.' });
+    }
 
     // Build subjects array from unique subjects in classAssignments
     const subjectsArray = classAssignments && Array.isArray(classAssignments)
@@ -1048,7 +1075,8 @@ router.get('/analytics', async (req, res) => {
     let failed = 0;
     for (const r of resultPassFail) {
       const exam = examMap[r.examId];
-      const passMark = exam?.passMark || 50;
+      if (!exam) continue; // Skip orphan results from deleted exams
+      const passMark = exam.passMark || 50;
       if (r.percentage >= passMark) {
         passed++;
       } else {
@@ -1933,7 +1961,7 @@ router.get('/results/export/:examId', async (req, res) => {
       const student = r.student;
       const pct = r.percentage || 0;
       const isPassed = pct >= passMark;
-      const grade = pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : pct >= 50 ? 'E' : 'F';
+      const grade = pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : pct >= passMark ? 'E' : 'F';
       const timeMins = Math.round(r.timeSpent / 60);
 
       // Alternate row background

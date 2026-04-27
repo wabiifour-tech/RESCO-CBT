@@ -283,7 +283,8 @@ export default function StudentDashboard() {
       setAnswers({});
       answersRef.current = {};
       setCurrentQuestion(0);
-      setTimeLeft(exam.duration * 60);
+      const durationSeconds = Math.max(Number(exam.duration) || 0, 60) * 60;
+      setTimeLeft(durationSeconds);
       startTimeRef.current = Date.now();
       if (examStartTime) startTimeRef.current = new Date(examStartTime).getTime();
       setExamResult(null);

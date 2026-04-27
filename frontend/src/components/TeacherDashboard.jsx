@@ -108,7 +108,8 @@ export default function TeacherDashboard() {
   const fetchDownloadOptions = useCallback(async () => {
     try {
       const { data } = await api.get('/exams/teacher');
-      const examList = data.exams || [];
+      const examsData = data?.data || data;
+      const examList = examsData?.exams || [];
       const classSet = new Set();
       const subjectSet = new Set();
       const classes = [];
@@ -151,16 +152,16 @@ export default function TeacherDashboard() {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    if (!passwordForm.currentPassword || !passwordForm.currentPassword.trim()) {
-      toast.error('Current password is required.');
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters');
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast.error('New passwords do not match');
       return;
     }
-    if (passwordForm.newPassword.length < 6) {
-      toast.error('New password must be at least 6 characters');
+    if (!passwordForm.currentPassword || !passwordForm.currentPassword.trim()) {
+      toast.error('Current password is required.');
       return;
     }
     try {

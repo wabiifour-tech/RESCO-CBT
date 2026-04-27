@@ -544,6 +544,14 @@ export default function PrincipalDashboard() {
   // ─── Teacher CRUD Handlers ──────────────────────────────────────────────
   const handleCreateTeacher = async (e) => {
     e.preventDefault();
+    if (!teacherForm.firstName || !teacherForm.lastName || !teacherForm.username || !teacherForm.password) {
+      toast.error('All fields are required');
+      return;
+    }
+    if (teacherForm.password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
     const validAssignments = teacherClassAssignments.filter(a => a.className && a.subject);
     try {
       await api.post('/principal/teachers/create', {

@@ -48,7 +48,7 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
       return res.status(403).json({ success: false, message: 'You are not authorized to take this exam. Class mismatch.' });
     }
 
-    // Check student hasn't already submitted
+    // Check student hasn't already submitted (optimistic pre-check)
     const existingResult = await prisma.result.findUnique({
       where: { examId_studentId: { examId, studentId } },
     });
@@ -115,8 +115,16 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
 
     const startTime = (startTimeRaw instanceof Date && !isNaN(startTimeRaw.getTime())) ? startTimeRaw : now;
 
-    // Create result and answers in transaction
+    // Create result and answers in a single atomic transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Re-check for duplicate inside transaction to prevent race conditions
+      const existingResult = await tx.result.findUnique({
+        where: { examId_studentId: { examId, studentId } },
+      });
+      if (existingResult) {
+        throw new Error('ALREADY_SUBMITTED');
+      }
+
       const newResult = await tx.result.create({
         data: {
           examId,
@@ -179,6 +187,9 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
     res.status(201).json(responseData);
   } catch (error) {
     console.error('Submit exam error:', error);
+    if (error.message === 'ALREADY_SUBMITTED') {
+      return res.status(409).json({ success: false, message: 'You have already submitted this exam.' });
+    }
     if (error.code === 'P2002') {
       return res.status(409).json({ success: false, message: 'You have already submitted this exam.' });
     }
@@ -212,7 +223,8 @@ router.get('/student', authenticate, requireRole('STUDENT'), async (req, res) =>
 
     // Hide scores for non-IMMEDIATE visibility exams
     const sanitized = results.map(r => {
-      const showScores = r.exam?.resultVisibility === 'IMMEDIATE';
+      const showScores = r.exam?.resultVisibility === 'IMMEDIATE' ||
+        (r.exam?.resultVisibility === 'AFTER_CLOSE' && r.exam?.endDate && new Date(r.exam.endDate) <= new Date());
       return {
         id: r.id,
         examId: r.examId,
@@ -394,9 +406,23 @@ router.get('/teacher', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requir
       _count: true,
     });
 
-    // Compute pass rate using each exam's actual passMark (not hardcoded 50)
-    const passRate = results.length > 0
-      ? Math.round(results.filter(r => r.percentage >= (r.exam?.passMark || 50)).length / results.length * 100 * 10) / 10
+    // Compute pass rate from ALL results (not just current page)
+    const allResultsForPassRate = await prisma.result.findMany({
+      where,
+      select: { examId: true, percentage: true },
+    });
+    
+    // Get passMarks for all exams in results
+    const examIdsForPassRate = [...new Set(allResultsForPassRate.map(r => r.examId))];
+    const examPassMarkRecords = await prisma.exam.findMany({
+      where: { id: { in: examIdsForPassRate } },
+      select: { id: true, passMark: true },
+    });
+    const examPassMarkMap = {};
+    examPassMarkRecords.forEach(e => { examPassMarkMap[e.id] = e.passMark || 50; });
+    
+    const passRate = allResultsForPassRate.length > 0
+      ? Math.round(allResultsForPassRate.filter(r => r.percentage >= (examPassMarkMap[r.examId] || 50)).length / allResultsForPassRate.length * 100 * 10) / 10
       : 0;
 
     res.json({

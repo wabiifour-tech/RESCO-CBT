@@ -117,12 +117,30 @@ function parseCSV(buffer) {
   const rows = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
+    let line = lines[i].trim();
     if (!line) continue; // skip empty lines
 
-    // Simple CSV split - handles basic cases. For quoted fields with commas,
-    // a more robust parser would be needed, but this suffices for CBT data.
-    const values = line.split(',').map((v) => v.trim());
+    // Handle quoted CSV fields (commas inside double-quoted strings)
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+    for (let c = 0; c < line.length; c++) {
+      const ch = line[c];
+      if (ch === '"') {
+        if (inQuotes && c + 1 < line.length && line[c + 1] === '"') {
+          current += '"'; // escaped quote
+          c++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    values.push(current.trim()); // last field
 
     if (values.length < 7) {
       rows.push({ _rawIndex: i + 1, _parseError: `Row ${i + 1}: Expected 7 columns but found ${values.length}.` });

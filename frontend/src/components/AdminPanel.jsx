@@ -454,6 +454,22 @@ export default function AdminPanel() {
 
   const handleCreateExam = async (e) => {
     e.preventDefault();
+    if (!examForm.title || !examForm.title.trim()) {
+      toast.error('Exam title is required');
+      return;
+    }
+    if (!examForm.subject || !examForm.subject.trim()) {
+      toast.error('Subject is required');
+      return;
+    }
+    if (!examForm.className || !examForm.className.trim()) {
+      toast.error('Class is required');
+      return;
+    }
+    if (!examForm.duration || Number(examForm.duration) <= 0) {
+      toast.error('Duration must be greater than 0');
+      return;
+    }
     try {
       const res = await api.post('/admin/exams/create', examForm);
       toast.success(res.data.message);

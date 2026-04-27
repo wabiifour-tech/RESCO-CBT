@@ -108,7 +108,7 @@ const formatTime = (totalSeconds) => {
  * @param {string} className - The student's class name, e.g. "JSS1", "SSS2"
  * @returns {Promise<string>} The generated admission number
  */
-const generateAdmissionNo = async (className) => {
+const generateAdmissionNo = async (className, maxRetries = 3) => {
   if (!className || typeof className !== 'string') {
     throw new Error('Class name is required to generate admission number.');
   }
@@ -117,38 +117,46 @@ const generateAdmissionNo = async (className) => {
   const currentYear = new Date().getFullYear();
   const normalizedClass = className.trim().toUpperCase();
 
-  // Find the latest admission number for this class and year
-  const prefix = `RES/${currentYear}/${normalizedClass}/`;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const prefix = `RES/${currentYear}/${normalizedClass}/`;
 
-  const lastStudent = await prisma.student.findFirst({
-    where: {
-      admissionNo: {
-        startsWith: prefix,
+    const lastStudent = await prisma.student.findFirst({
+      where: {
+        admissionNo: {
+          startsWith: prefix,
+        },
       },
-    },
-    orderBy: {
-      admissionNo: 'desc',
-    },
-    select: {
-      admissionNo: true,
-    },
-  });
+      orderBy: {
+        admissionNo: 'desc',
+      },
+      select: {
+        admissionNo: true,
+      },
+    });
 
-  let nextNumber = 1;
-
-  if (lastStudent) {
-    const lastAdmissionNo = lastStudent.admissionNo;
-    const parts = lastAdmissionNo.split('/');
-    const lastNum = parseInt(parts[parts.length - 1], 10);
-
-    if (!isNaN(lastNum)) {
-      nextNumber = lastNum + 1;
+    let nextNumber = 1;
+    if (lastStudent) {
+      const lastAdmissionNo = lastStudent.admissionNo;
+      const parts = lastAdmissionNo.split('/');
+      const lastNum = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastNum)) {
+        nextNumber = lastNum + 1;
+      }
     }
+
+    const paddedNumber = String(nextNumber).padStart(3, '0');
+    const admissionNo = `${prefix}${paddedNumber}`;
+
+    // Verify it doesn't exist (race condition guard)
+    const exists = await prisma.student.findUnique({
+      where: { admissionNo },
+      select: { id: true },
+    });
+    if (!exists) return admissionNo;
+    // Collision — retry with next number
   }
 
-  const paddedNumber = String(nextNumber).padStart(3, '0');
-
-  return `${prefix}${paddedNumber}`;
+  throw new Error('Failed to generate unique admission number after retries.');
 };
 
 /**

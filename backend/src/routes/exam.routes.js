@@ -520,6 +520,17 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Exam not found.' });
     }
 
+    // Students can only see their own class's published exams
+    if (req.user.role === 'STUDENT') {
+      const student = await prisma.student.findUnique({
+        where: { id: req.user.userId },
+        select: { className: true },
+      });
+      if (!student || student.className !== exam.className || exam.status !== 'PUBLISHED') {
+        return res.status(403).json({ success: false, message: 'You cannot access this exam.' });
+      }
+    }
+
     res.json({ success: true, exam });
   } catch (error) {
     console.error('Get exam details error:', error);
