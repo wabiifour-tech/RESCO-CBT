@@ -154,7 +154,7 @@ router.get('/analytics', async (req, res) => {
       if (!subjectScores[subj]) {
         subjectScores[subj] = { total: 0, count: 0 };
       }
-      subjectScores[subj].total += r._avg.percentage || 0;
+      subjectScores[subj].total += (r._avg.percentage || 0) * r._count;
       subjectScores[subj].count += r._count;
     }
 
@@ -827,6 +827,10 @@ router.post('/teachers/create', async (req, res) => {
       return res.status(409).json({ success: false, message: 'A teacher with this username already exists' });
     }
     const generatedEmail = `${trimmedUsername}@resco.local`;
+    const existingEmail = await prisma.user.findUnique({ where: { email: generatedEmail } });
+    if (existingEmail) {
+      return res.status(409).json({ success: false, message: 'A user with this generated email already exists.' });
+    }
     // Build subjects array from unique subjects in classAssignments
     const subjectsArray = classAssignments && Array.isArray(classAssignments)
       ? [...new Set(classAssignments.map(ca => ca.subject.trim()))]
@@ -1168,6 +1172,9 @@ router.put('/users/:id/password', async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (user.role === 'ADMIN' || user.role === 'PRINCIPAL') {
+      return res.status(403).json({ success: false, message: 'Cannot reset this user\'s password.' });
     }
     await prisma.user.update({
       where: { id },

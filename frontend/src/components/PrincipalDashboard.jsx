@@ -623,7 +623,11 @@ export default function PrincipalDashboard() {
       await api.post('/principal/settings/logo', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success('Logo uploaded successfully!');
       setShowLogoModal(false);
-      window.location.reload();
+      // Re-fetch logo instead of full reload
+      try {
+        const logoRes = await api.get('/principal/settings/logo');
+        setSchoolLogo(logoRes.data?.logo || null);
+      } catch (e) { /* ignore */ }
     } catch (err) {
       toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to upload logo');
     } finally { setLogoUploading(false); }
@@ -635,7 +639,11 @@ export default function PrincipalDashboard() {
       await api.delete('/principal/settings/logo');
       toast.success('Logo reset to default');
       setShowLogoModal(false);
-      window.location.reload();
+      // Re-fetch logo instead of full reload
+      try {
+        const logoRes = await api.get('/principal/settings/logo');
+        setSchoolLogo(logoRes.data?.logo || null);
+      } catch (e) { /* ignore */ }
     } catch (err) {
       toast.error('Failed to reset logo');
     }

@@ -919,7 +919,7 @@ router.get('/analytics', async (req, res) => {
       if (!subjectScores[subj]) {
         subjectScores[subj] = { total: 0, count: 0 };
       }
-      subjectScores[subj].total += r._avg.percentage || 0;
+      subjectScores[subj].total += (r._avg.percentage || 0) * r._count;
       subjectScores[subj].count += r._count;
     }
 
@@ -1180,6 +1180,24 @@ router.post('/exams/create', async (req, res) => {
 
     if (!title || !duration || !subject || !className) {
       return res.status(400).json({ error: 'Missing required fields: title, duration, subject, className' });
+    }
+
+    if (teacherId) {
+      const targetTeacher = await prisma.teacher.findUnique({
+        where: { id: teacherId },
+        select: { id: true, status: true },
+      });
+      if (!targetTeacher) {
+        return res.status(404).json({ error: 'Specified teacher not found.' });
+      }
+      if (targetTeacher.status !== 'ACTIVE') {
+        return res.status(400).json({ error: 'Cannot assign exam to a non-active teacher.' });
+      }
+    }
+
+    const validTypes = ['TEST', 'EXAM'];
+    if (type && !validTypes.includes(type)) {
+      return res.status(400).json({ error: `Invalid type. Must be one of: ${validTypes.join(', ')}` });
     }
 
     const dur = parseInt(duration, 10);
@@ -1805,7 +1823,7 @@ router.get('/results/export/:examId', async (req, res) => {
     if (results.length === 0) return res.status(404).json({ error: 'No results found for this exam.' });
 
     const passMark = exam.passMark || 50;
-    const teacherName = exam.teacher ? `${exam.teacher.firstName} ${exam.lastName}` : 'Teacher';
+    const teacherName = exam.teacher ? `${exam.teacher.firstName} ${exam.teacher.lastName}` : 'Teacher';
     const now = new Date();
     const downloadDate = now.toLocaleDateString('en-NG', { year: 'numeric', month: 'long', day: 'numeric' });
     const downloadTime = now.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1896,7 +1914,7 @@ router.get('/results/export/:examId', async (req, res) => {
 
     // --- Results Table Header ---
     const tableTop = summaryY + 26;
-    const cols = [30, 120, 90, 85, 45, 45, 45, 55, 65, 85];
+    const cols = [25, 95, 80, 70, 40, 40, 40, 40, 55, 55]; // sum = 500
     const headers = ['#', 'Student Name', 'Admission No', 'Class', 'Score', 'Total', '%', 'Grade', 'Status', 'Time'];
     const colX = [45];
     for (let i = 0; i < cols.length - 1; i++) colX.push(colX[i] + cols[i]);

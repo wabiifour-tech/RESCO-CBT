@@ -35,6 +35,10 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
       return res.status(400).json({ success: false, message: 'This exam is not available.' });
     }
 
+    if (exam.endDate && new Date(exam.endDate) < now) {
+      return res.status(400).json({ success: false, message: 'This exam has closed and no longer accepts submissions.' });
+    }
+
     // Verify student belongs to the exam's class
     const student = await prisma.student.findUnique({
       where: { id: studentId },
@@ -104,7 +108,8 @@ router.post('/submit', authenticate, requireRole('STUDENT'), async (req, res) =>
       };
     });
 
-    const totalMarks = exam.totalMarks || questions.reduce((sum, q) => sum + q.marks, 0);
+    const actualTotalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+    const totalMarks = actualTotalMarks > 0 ? actualTotalMarks : (exam.totalMarks || 0);
     const percentage = totalMarks > 0 ? (score / totalMarks) * 100 : 0;
     const passed = percentage >= exam.passMark;
 
@@ -294,6 +299,7 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
             examStartTime: result.examStartTime,
             examEndTime: result.examEndTime,
             showScores: false,
+            showDetails: false,
           },
         });
       }
@@ -328,7 +334,7 @@ router.get('/student/:examId', authenticate, requireRole('STUDENT'), async (req,
 // TEACHER: Get Exam Results (with exam times)
 // ========================================
 
-router.get('/teacher', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+router.get('/teacher', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { examId, className, page = 1, limit = 20 } = req.query;
 
@@ -337,12 +343,16 @@ router.get('/teacher', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async 
       // Teachers can see results for exams they created OR exams assigned to their classes
       const classAssignments = await prisma.teacherClass.findMany({
         where: { teacherId: req.user.userId },
-        select: { className: true },
+        select: { className: true, subject: true },
       });
-      const assignedClasses = [...new Set(classAssignments.map(ca => ca.className))];
       const examWhere = [{ teacherId: req.user.userId }];
-      if (assignedClasses.length > 0) {
-        examWhere.push({ className: { in: assignedClasses } });
+      if (classAssignments.length > 0) {
+        examWhere.push({
+          OR: classAssignments.map(ca => ({
+            className: ca.className,
+            subject: ca.subject,
+          })),
+        });
       }
       where.exam = { OR: examWhere };
     }
@@ -413,7 +423,7 @@ router.get('/teacher', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async 
 });
 
 // TEACHER: Detailed results for a specific exam
-router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { examId } = req.params;
 
@@ -422,12 +432,16 @@ router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER', 'PRI
     if (req.user.role === 'TEACHER') {
       const classAssignments = await prisma.teacherClass.findMany({
         where: { teacherId: req.user.userId },
-        select: { className: true },
+        select: { className: true, subject: true },
       });
-      const assignedClasses = [...new Set(classAssignments.map(ca => ca.className))];
       const orConditions = [{ teacherId: req.user.userId }];
-      if (assignedClasses.length > 0) {
-        orConditions.push({ className: { in: assignedClasses } });
+      if (classAssignments.length > 0) {
+        orConditions.push({
+          OR: classAssignments.map(ca => ({
+            className: ca.className,
+            subject: ca.subject,
+          })),
+        });
       }
       where.OR = orConditions;
       delete where.id;
@@ -486,7 +500,7 @@ router.get('/teacher/:examId/details', authenticate, requireRole('TEACHER', 'PRI
 // TEACHER: Export Results as Watermarked PDF
 // ========================================
 
-router.get('/export/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+router.get('/export/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { examId } = req.params;
     const { format } = req.query;
@@ -496,12 +510,16 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'),
     if (req.user.role === 'TEACHER') {
       const classAssignments = await prisma.teacherClass.findMany({
         where: { teacherId: req.user.userId },
-        select: { className: true },
+        select: { className: true, subject: true },
       });
-      const assignedClasses = [...new Set(classAssignments.map(ca => ca.className))];
       const orConditions = [{ teacherId: req.user.userId }];
-      if (assignedClasses.length > 0) {
-        orConditions.push({ className: { in: assignedClasses } });
+      if (classAssignments.length > 0) {
+        orConditions.push({
+          OR: classAssignments.map(ca => ({
+            className: ca.className,
+            subject: ca.subject,
+          })),
+        });
       }
       where.OR = orConditions;
       delete where.id;
@@ -540,7 +558,7 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'),
     if (format === 'csv') {
       const filename = `${exam.title.replace(/[^a-zA-Z0-9]/g, '_')}_results`;
       const headers = ['Admission No', 'First Name', 'Last Name', 'Class', 'Score', 'Total Marks', 'Percentage', 'Time Spent (min)', 'Exam Start Time', 'Exam End Time', 'Submitted At'];
-      const rows = results.map(r => [
+      const rows = validResults.map(r => [
         r.student?.admissionNo || 'N/A',
         r.student?.firstName || 'Unknown',
         r.student?.lastName || 'Unknown',
@@ -667,9 +685,10 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'),
          .fill('#f5f3ff');
 
       // Score display
+      const passMark = exam.passMark || 50;
       const pct = Math.round(result.percentage);
-      const gradeColor = pct >= 50 ? '#059669' : '#dc2626';
-      const grade = pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : pct >= 50 ? 'E' : 'F';
+      const gradeColor = pct >= passMark ? '#059669' : '#dc2626';
+      const grade = pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : pct >= passMark ? 'E' : 'F';
 
       doc.fontSize(11).fillColor('#4c1d95').font('Helvetica-Bold')
          .text('Score:', col1 + 20, scoreTop + 10);
@@ -685,8 +704,8 @@ router.get('/export/:examId', authenticate, requireRole('TEACHER', 'PRINCIPAL'),
 
       doc.fontSize(11).fillColor('#4c1d95').font('Helvetica-Bold')
          .text('Status:', col1 + 370, scoreTop + 10);
-      const statusText = pct >= 50 ? 'PASSED' : 'FAILED';
-      const statusColor = pct >= 50 ? '#059669' : '#dc2626';
+      const statusText = pct >= passMark ? 'PASSED' : 'FAILED';
+      const statusColor = pct >= passMark ? '#059669' : '#dc2626';
       doc.fontSize(16).fillColor(statusColor).font('Helvetica-Bold')
          .text(statusText, col1 + 430, scoreTop + 12);
 

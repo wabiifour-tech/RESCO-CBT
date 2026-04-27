@@ -168,6 +168,21 @@ router.put('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTea
 
     const { title, description, type, duration, totalMarks, passMark, startDate, endDate, resultVisibility, shuffleQuestions, shuffleOptions, subject, className } = req.body;
 
+    if (type && !['TEST', 'EXAM'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Invalid exam type. Must be TEST or EXAM.' });
+    }
+    if (resultVisibility && !['IMMEDIATE', 'MANUAL', 'AFTER_CLOSE'].includes(resultVisibility)) {
+      return res.status(400).json({ success: false, message: 'Invalid resultVisibility. Must be IMMEDIATE, MANUAL, or AFTER_CLOSE.' });
+    }
+    if (startDate) {
+      const sd = new Date(startDate);
+      if (isNaN(sd.getTime())) return res.status(400).json({ success: false, message: 'Invalid startDate format.' });
+    }
+    if (endDate) {
+      const ed = new Date(endDate);
+      if (isNaN(ed.getTime())) return res.status(400).json({ success: false, message: 'Invalid endDate format.' });
+    }
+
     const updated = await prisma.exam.update({
       where: { id },
       data: {
@@ -195,7 +210,7 @@ router.put('/:id', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTea
 });
 
 // Publish Exam — TEACHER, PRINCIPAL, ADMIN
-router.patch('/:id/publish', authenticate, requireRole('TEACHER', 'PRINCIPAL'), async (req, res) => {
+router.patch('/:id/publish', authenticate, requireRole('TEACHER', 'PRINCIPAL'), requireTeacherActive, async (req, res) => {
   try {
     const { id } = req.params;
 

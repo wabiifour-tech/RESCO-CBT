@@ -151,6 +151,10 @@ export default function TeacherDashboard() {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
+    if (!passwordForm.currentPassword || !passwordForm.currentPassword.trim()) {
+      toast.error('Current password is required.');
+      return;
+    }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast.error('New passwords do not match');
       return;
@@ -207,6 +211,22 @@ export default function TeacherDashboard() {
 
   const handleCreateExam = async (e) => {
     e.preventDefault();
+    if (!createForm.title || !createForm.title.trim()) {
+      toast.error('Exam title is required.');
+      return;
+    }
+    if (!createForm.subject || !createForm.subject.trim()) {
+      toast.error('Subject is required.');
+      return;
+    }
+    if (!createForm.className || !createForm.className.trim()) {
+      toast.error('Class is required.');
+      return;
+    }
+    if (!createForm.duration || createForm.duration <= 0) {
+      toast.error('Duration must be greater than 0.');
+      return;
+    }
     try {
       await api.post('/exams', createForm);
       toast.success('Exam created successfully!');

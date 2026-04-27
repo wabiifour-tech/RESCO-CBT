@@ -318,6 +318,14 @@ export default function AdminPanel() {
 
   const handleCreateTeacher = async (e) => {
     e.preventDefault();
+    if (!teacherForm.firstName || !teacherForm.lastName || !teacherForm.username || !teacherForm.password) {
+      toast.error('All fields are required.');
+      return;
+    }
+    if (teacherForm.password.length < 6) {
+      toast.error('Password must be at least 6 characters.');
+      return;
+    }
     // Filter out empty assignments
     const validAssignments = teacherClassAssignments.filter(a => a.className && a.subject);
     try {
@@ -340,6 +348,14 @@ export default function AdminPanel() {
 
   const handleCreateStudent = async (e) => {
     e.preventDefault();
+    if (!studentForm.firstName || !studentForm.lastName || !studentForm.admissionNo || !studentForm.className || !studentForm.email || !studentForm.password) {
+      toast.error('All fields are required.');
+      return;
+    }
+    if (studentForm.password.length < 6) {
+      toast.error('Password must be at least 6 characters.');
+      return;
+    }
     try {
       const res = await api.post('/admin/students/create', {
         firstName: studentForm.firstName,

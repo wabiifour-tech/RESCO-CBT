@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import useAuthStore from '../store/authStore';
@@ -87,40 +87,39 @@ function formatTimer(seconds) {
   return result;
 }
 
-// Confetti particle component using pure CSS
-function ConfettiParticle({ delay, left, color, size }) {
-  const style = {
-    position: 'fixed',
-    top: '-10px',
-    left: left + '%',
-    width: size + 'px',
-    height: size + 'px',
-    backgroundColor: color,
-    borderRadius: Math.random() > 0.5 ? '50%' : '2px',
-    animation: 'confettiFall ' + (2 + Math.random() * 3) + 's ease-in ' + delay + 's infinite',
-    zIndex: 50,
-    pointerEvents: 'none',
-  };
-  return <div style={style} />;
-}
-
+// Confetti particle component using pure CSS (useMemo prevents re-renders from changing random values)
 function ConfettiEffect() {
-  const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'];
-  const particles = [];
-  for (let i = 0; i < 40; i++) {
-    particles.push(
-      <ConfettiParticle
-        key={i}
-        delay={i * 0.1}
-        left={Math.random() * 100}
-        color={colors[i % colors.length]}
-        size={6 + Math.random() * 8}
-      />
-    );
-  }
+  const confettiParticles = useMemo(() =>
+    Array.from({ length: 40 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      size: Math.random() * 8 + 4,
+      borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+      animationDuration: Math.random() * 2 + 2,
+      animationDelay: i * 0.1,
+      color: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'][i % 10],
+    }))
+  , []);
+
   return (
     <div>
-      {particles}
+      {confettiParticles.map(p => (
+        <div
+          key={p.id}
+          style={{
+            position: 'fixed',
+            top: '-10px',
+            left: p.left + '%',
+            width: p.size + 'px',
+            height: p.size + 'px',
+            backgroundColor: p.color,
+            borderRadius: p.borderRadius,
+            animation: 'confettiFall ' + p.animationDuration + 's ease-in ' + p.animationDelay + 's infinite',
+            zIndex: 50,
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
       <style>{`
         @keyframes confettiFall {
           0% { transform: translateY(0) rotate(0deg); opacity: 1; }
@@ -162,6 +161,7 @@ export default function StudentDashboard() {
   const questionsRef = useRef([]);
   const examDetailRef = useRef(null);
   const hasSubmittedRef = useRef(false);
+  const submittingRef = useRef(false);
 
   const studentName = (user && user.student && (user.student.firstName || user.student.lastName))
     ? (user.student.firstName + ' ' + (user.student.lastName || '')).trim()
@@ -208,9 +208,9 @@ export default function StudentDashboard() {
     return function () { clearInterval(interval); };
   }, []);
 
-  // Timer countdown
+  // Timer countdown — only depends on view to avoid recreating interval every second (timer drift fix)
   useEffect(function () {
-    if (view !== 'exam' || timeLeft <= 0) return;
+    if (view !== 'exam') return;
     timerRef.current = setInterval(function () {
       setTimeLeft(function (t) {
         if (t <= 1) {
@@ -227,7 +227,7 @@ export default function StudentDashboard() {
         timerRef.current = null;
       }
     };
-  }, [view, timeLeft]);
+  }, [view]);
 
   // Auto-submit when timer reaches zero (separate effect avoids calling async inside state updater)
   useEffect(function () {
@@ -295,7 +295,8 @@ export default function StudentDashboard() {
   };
 
   const doSubmitExam = useCallback(async function () {
-    if (submitting) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setShowSubmitModal(false);
     setSubmitting(true);
 
@@ -313,14 +314,16 @@ export default function StudentDashboard() {
         timeSpent: elapsed,
         examStartTime: startTimeRef.current ? new Date(startTimeRef.current).toISOString() : null,
       });
-      setExamResult(res.data?.data?.result || res.data?.result);
-      toast.success(res.data.result.passed === true ? 'Congratulations! You passed!' : 'Exam submitted. Keep practicing!');
-      fetchResults();
-      fetchExams();
+      const examResultData = res.data?.data?.result || res.data?.result;
+      setExamResult(examResultData);
+      toast.success(examResultData?.passed === true ? 'Congratulations! You passed!' : 'Exam submitted. Keep practicing!');
+      fetchResults().catch(() => {});
+      fetchExams().catch(() => {});
     } catch (err) {
       toast.error(err.response && err.response.data && err.response.data.message ? err.response.data.message : 'Failed to submit');
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   }, []);
 
@@ -381,6 +384,10 @@ export default function StudentDashboard() {
 
   const handleChangePassword = async function (e) {
     e.preventDefault();
+    if (!passwordForm.currentPassword || !passwordForm.currentPassword.trim()) {
+      toast.error('Current password is required.');
+      return;
+    }
     if (passwordForm.newPassword.length < 6) {
       toast.error('New password must be at least 6 characters');
       return;
