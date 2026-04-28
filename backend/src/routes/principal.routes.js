@@ -289,7 +289,7 @@ router.get('/analytics', async (req, res) => {
     res.json({
       performanceByClass,
       performanceBySubject,
-      passFail: { passed: passedCount, failed: failedCount, total: resultPassFail.length },
+      passFail: { passed: passedCount, failed: failedCount, total: passedCount + failedCount }, // exclude orphan results from deleted exams
       topStudents,
       recentlyActiveExams: recentExams,
       examCompletionRates,

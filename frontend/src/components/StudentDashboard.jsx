@@ -78,6 +78,7 @@ function getSubjectLightColor(index) {
 }
 
 function formatTimer(seconds) {
+  seconds = Math.max(0, Math.floor(seconds || 0));
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
@@ -196,17 +197,29 @@ export default function StudentDashboard() {
     fetchResults();
   }, [fetchExams, fetchResults]);
 
-  // Tip rotation
+  // Tip rotation — clean up inner setTimeout on unmount
   useEffect(function () {
+    let timeoutId;
     const interval = setInterval(function () {
       setTipFade(false);
-      setTimeout(function () {
+      timeoutId = setTimeout(function () {
         setTipIndex(function (prev) { return (prev + 1) % EXAM_TIPS.length; });
         setTipFade(true);
       }, 500);
     }, 5000);
-    return function () { clearInterval(interval); };
+    return function () { clearInterval(interval); if (timeoutId) clearTimeout(timeoutId); };
   }, []);
+
+  // Warn user before leaving page during active exam
+  useEffect(function () {
+    if (view !== 'exam' || examResult) return;
+    const handler = function (e) {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return function () { window.removeEventListener('beforeunload', handler); };
+  }, [view, examResult]);
 
   // Timer countdown — only depends on view to avoid recreating interval every second (timer drift fix)
   useEffect(function () {
@@ -297,6 +310,11 @@ export default function StudentDashboard() {
 
   const doSubmitExam = useCallback(async function () {
     if (submittingRef.current) return;
+    // Guard: prevent submission if no active exam
+    if (!examDetailRef.current || !questionsRef.current || questionsRef.current.length === 0) {
+      submittingRef.current = false;
+      return;
+    }
     submittingRef.current = true;
     setShowSubmitModal(false);
     setSubmitting(true);
@@ -322,6 +340,8 @@ export default function StudentDashboard() {
       fetchExams().catch(() => {});
     } catch (err) {
       toast.error(err.response && err.response.data && err.response.data.message ? err.response.data.message : 'Failed to submit');
+      // Allow retry on submission failure
+      hasSubmittedRef.current = false;
     } finally {
       setSubmitting(false);
       submittingRef.current = false;
@@ -350,6 +370,12 @@ export default function StudentDashboard() {
     setCurrentQuestion(0);
     setExamResult(null);
     setShowSubmitModal(false);
+    // Reset refs to prevent stale data from leaking
+    examDetailRef.current = null;
+    questionsRef.current = [];
+    answersRef.current = {};
+    startTimeRef.current = null;
+    hasSubmittedRef.current = false;
     fetchExams();
   };
 

@@ -32,7 +32,18 @@ function parseCSV(buffer) {
   const content = buffer.toString('utf-8').trim();
   const lines = content.split(/\r?\n/);
   if (lines.length < 2) return { error: 'CSV must have a header row and at least one data row.' };
-  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  // Parse header row — handle quoted headers (e.g., "question","optionA")
+  const headerValues = [];
+  let hCurrent = '';
+  let hInQuotes = false;
+  for (let c = 0; c < lines[0].length; c++) {
+    const ch = lines[0][c];
+    if (ch === '"') { hInQuotes = !hInQuotes; }
+    else if (ch === ',' && !hInQuotes) { headerValues.push(hCurrent.trim().toLowerCase()); hCurrent = ''; }
+    else { hCurrent += ch; }
+  }
+  headerValues.push(hCurrent.trim().toLowerCase());
+  const headers = headerValues;
   const expected = ['question', 'optiona', 'optionb', 'optionc', 'optiond', 'answer', 'marks'];
   const missing = expected.filter((h) => !headers.includes(h));
   if (missing.length > 0) return { error: `Missing headers: ${missing.join(', ')}. Required: ${expected.join(', ')}` };
@@ -1083,7 +1094,7 @@ router.get('/analytics', async (req, res) => {
         failed++;
       }
     }
-    const passFail = { passed, failed, total: resultPassFail.length };
+    const passFail = { passed, failed, total: passed + failed }; // exclude orphan results from deleted exams
 
     res.json({
       performanceByClass,

@@ -138,7 +138,7 @@ export default function AdminPanel() {
   const [resClass, setResClass] = useState('');
   const [resSubject, setResSubject] = useState('');
   const [resExamId, setResExamId] = useState('');
-  const [resLoading, setResLoading] = useState(false);
+  const [resDownloading, setResDownloading] = useState(false);
   const [resPreview, setResPreview] = useState(null);
 
   // Sidebar responsive state
@@ -444,7 +444,7 @@ export default function AdminPanel() {
         startDate: datesForm.startDate,
         endDate: datesForm.endDate,
       });
-      toast.success(res.data.message);
+      toast.success(res.data.message || 'Operation successful');
       setShowDatesModal(false);
       setDatesExam(null);
       fetchAllExams();
@@ -474,7 +474,7 @@ export default function AdminPanel() {
     }
     try {
       const res = await api.post('/admin/exams/create', examForm);
-      toast.success(res.data.message);
+      toast.success(res.data.message || 'Operation successful');
       setShowExamModal(false);
       setExamForm({ subject: '', className: 'JSS1', title: '', description: '', type: 'TEST', duration: 60, totalMarks: 100, passMark: 50, startDate: '', endDate: '', resultVisibility: 'MANUAL', teacherId: '' });
       fetchAllExams();
@@ -589,7 +589,7 @@ export default function AdminPanel() {
     try {
       const filtered = manualQuestions.filter(function (q) { return q.question.trim(); });
       const res = await api.post('/admin/questions/manual', { examId: selectedExamId, questions: filtered });
-      toast.success(res.data.message);
+      toast.success(res.data.message || 'Operation successful');
       setShowManualModal(false);
       setManualQuestions(
         Array.from({ length: 5 }, function () { return { question: '', optionA: '', optionB: '', optionC: '', optionD: '', answer: 'A', marks: 1 }; })
@@ -1976,6 +1976,7 @@ export default function AdminPanel() {
   const handleResDownloadPDF = async () => {
     if (!resExamId) { toast.error('Please select an exam'); return; }
     try {
+      setResDownloading(true);
       toast.loading('Generating PDF...');
       const res = await api.get(`/admin/results/export/${resExamId}?format=pdf`, { responseType: 'blob', timeout: 120000 });
       const blob = new Blob([res.data], { type: 'application/pdf' });
@@ -2003,6 +2004,8 @@ export default function AdminPanel() {
       } else {
         toast.error(data?.error || data?.message || 'Failed to download PDF');
       }
+    } finally {
+      setResDownloading(false);
     }
   };
 
@@ -2114,7 +2117,7 @@ export default function AdminPanel() {
           {/* Download Button */}
           <button
             onClick={handleResDownloadPDF}
-            disabled={!resExamId || resLoading}
+            disabled={!resExamId || resDownloading}
             style={{
               width: '100%', marginTop: 16, padding: '12px', fontSize: 14, fontWeight: 700,
               color: '#fff', background: resExamId ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#d1d5db',
@@ -2122,13 +2125,13 @@ export default function AdminPanel() {
               transition: 'all 0.2s',
             }}
           >
-            {resLoading ? 'Generating...' : '\u2B07 Download PDF'}
+            {resDownloading ? 'Generating...' : '\u2B07 Download PDF'}
           </button>
 
           {/* Download CSV Button */}
           <button
             onClick={handleResDownloadCSV}
-            disabled={!resExamId || resLoading}
+            disabled={!resExamId || resDownloading}
             style={{
               width: '100%', marginTop: 8, padding: '12px', fontSize: 14, fontWeight: 700,
               color: '#fff', background: resExamId ? 'linear-gradient(135deg, #059669, #047857)' : '#d1d5db',
@@ -2565,7 +2568,7 @@ export default function AdminPanel() {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 13, fontWeight: 600, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user.email}
+                {user?.email}
               </p>
               <p style={{ fontSize: 11, margin: '2px 0 0 0', opacity: 0.6 }}>Administrator</p>
             </div>

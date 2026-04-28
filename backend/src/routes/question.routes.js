@@ -104,8 +104,18 @@ function parseCSV(buffer) {
     return { error: 'CSV file must contain a header row and at least one data row.' };
   }
 
-  // Parse header row
-  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  // Parse header row — handle quoted headers (e.g., "question","optionA")
+  const headerValues = [];
+  let hCurrent = '';
+  let hInQuotes = false;
+  for (let c = 0; c < lines[0].length; c++) {
+    const ch = lines[0][c];
+    if (ch === '"') { hInQuotes = !hInQuotes; }
+    else if (ch === ',' && !hInQuotes) { headerValues.push(hCurrent.trim().toLowerCase()); hCurrent = ''; }
+    else { hCurrent += ch; }
+  }
+  headerValues.push(hCurrent.trim().toLowerCase());
+  const headers = headerValues;
 
   const expectedHeaders = ['question', 'optiona', 'optionb', 'optionc', 'optiond', 'answer', 'marks'];
   const missingHeaders = expectedHeaders.filter((h) => !headers.includes(h));
